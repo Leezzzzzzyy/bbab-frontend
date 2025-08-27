@@ -48,7 +48,7 @@ export default function RootLayout() {
             justifyContent: "center",
             backgroundColor: colors.background,
             zIndex: 1000,
-            opacity: fadeAnim, // Анимируем непрозрачность всего экрана загрузки
+            opacity: fadeAnim,
           }}
         >
           <Animated.Image

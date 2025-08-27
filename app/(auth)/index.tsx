@@ -64,7 +64,7 @@ export default function AuthIndex() {
               fontSize: 28,
             }}
           >
-            Приступить
+            ПРИСТУПИТЬ
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
