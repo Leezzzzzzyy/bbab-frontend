@@ -1,5 +1,6 @@
 import colors from "@/assets/colors";
 import { useAppFonts } from "@/assets/fonts/useFonts";
+import { usePhone } from "@/context/PhoneContext";
 import { useRef, useState } from "react";
 import {
   Image,
@@ -14,8 +15,10 @@ import {
 
 export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { fontsLoadded } = useAppFonts();
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [viewedPhoneNumber, setViewedPhoneNumber] = useState("");
   const inputRef = useRef<TextInput>(null);
+
+  const { setPhoneNumber } = usePhone();
 
   const formatPhoneNumber = (text: string) => {
     // Удаляем все нецифровые символы
@@ -44,7 +47,15 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
   const handlePhoneChange = (text: string) => {
     const formatted = formatPhoneNumber(text);
-    setPhoneNumber(formatted);
+    setViewedPhoneNumber(formatted);
+  };
+
+  const handlePhone = () => {
+    const cleanNumber = viewedPhoneNumber.replace(/\D/g, "");
+    setPhoneNumber(cleanNumber);
+    console.log(cleanNumber);
+    Keyboard.dismiss();
+    onNext();
   };
 
   return (
@@ -69,7 +80,7 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <TextInput
               ref={inputRef}
               style={styles.inputField}
-              value={phoneNumber}
+              value={viewedPhoneNumber}
               onChangeText={handlePhoneChange}
               placeholder="(999) 123-45-67"
               placeholderTextColor={colors.maintext + "40"}
@@ -82,8 +93,13 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
         <View style={styles.continueContainer}>
           <TouchableOpacity
-            onPress={() => onNext()}
-            style={styles.continueButton}
+            onPress={() => handlePhone()}
+            style={
+              viewedPhoneNumber.length < 15
+                ? styles.continueButtonInactive
+                : styles.continueButton
+            }
+            disabled={viewedPhoneNumber.length < 15}
           >
             <Text style={styles.continueText}>ПРОДОЛЖИТЬ</Text>
           </TouchableOpacity>
@@ -174,6 +190,14 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: colors.main,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 120,
+    borderRadius: 6,
+  },
+  continueButtonInactive: {
+    backgroundColor: colors.main,
+    opacity: 0.7,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginTop: 120,

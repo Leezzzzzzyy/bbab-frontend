@@ -36,7 +36,7 @@ export default function AuthIndex() {
             fontWeight: "bold",
           }}
         >
-          Amber
+          AMBER
         </Text>
         <Text
           style={{
