@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { CodeField } from "react-native-confirmation-code-field";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   onNext,
@@ -20,6 +21,15 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   const [code, setCode] = useState<string>("");
   const [isCodeResendable, setIsCodeResendable] = useState<boolean>(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const swipeBack = Gesture.Pan()
+    .minDistance(20)
+    .onEnd((event) => {
+      if (event.velocityX > 500 && event.translationX > 50) {
+        onBack();
+      }
+    })
+    .runOnJS(true);
 
   useEffect(() => {
     if (timeLeft === 0) {
@@ -35,60 +45,67 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   }, [timeLeft]);
 
   return (
-    <TouchableWithoutFeedback
-      accessible={false}
-      onPress={() => Keyboard.dismiss()}
-    >
-      <View style={styles.stepContainer}>
-        <Text style={styles.caption}>Проверка телефона</Text>
-        <View style={styles.informationContainer}>
-          <Image
-            source={require("@/assets/images/PhoneCheck.png")}
-            style={styles.informationLogo}
-          />
-          <Text style={styles.informationCaption}>Введите код</Text>
-          <Text style={styles.informationText}>
-            Мы отправили SMS с кодом проверки{"\n"}на Ваш телефон +7
-            {"(" +
-              phoneNumber.slice(0, 3) +
-              ") " +
-              phoneNumber.slice(3, 6) +
-              "-" +
-              phoneNumber.slice(6, 8) +
-              "-" +
-              phoneNumber.slice(8)}
-          </Text>
-
-          <CodeField
-            value={code}
-            onChangeText={setCode}
-            cellCount={5}
-            rootStyle={styles.codeFieldRoot}
-            keyboardType="number-pad"
-            renderCell={({ index, symbol }) => (
-              <View key={index} style={[styles.cell]}>
-                <Text style={styles.cellSymbol}>{symbol}</Text>
-              </View>
-            )}
-          />
-
-          {!isCodeResendable ? (
-            <Text style={styles.codeResetInactive}>
-              Отправить код заново через {timeLeft} сек
+    <GestureDetector gesture={swipeBack}>
+      <TouchableWithoutFeedback
+        accessible={false}
+        onPress={() => Keyboard.dismiss()}
+      >
+        <View style={styles.stepContainer}>
+          <TouchableOpacity>
+            <Text></Text>
+          </TouchableOpacity>
+          <Text style={styles.caption}>Проверка телефона</Text>
+          <View style={styles.informationContainer}>
+            <Image
+              source={require("@/assets/images/PhoneCheck.png")}
+              style={styles.informationLogo}
+            />
+            <Text style={styles.informationCaption}>Введите код</Text>
+            <Text style={styles.informationText}>
+              Мы отправили SMS с кодом проверки{"\n"}на Ваш телефон +7
+              {"(" +
+                phoneNumber.slice(0, 3) +
+                ") " +
+                phoneNumber.slice(3, 6) +
+                "-" +
+                phoneNumber.slice(6, 8) +
+                "-" +
+                phoneNumber.slice(8)}
             </Text>
-          ) : (
-            <TouchableOpacity
-              onPress={() => {
-                setTimeLeft(50);
-                setIsCodeResendable(false);
-              }}
-            >
-              <Text style={styles.codeResendActive}>Отправить код еще раз</Text>
-            </TouchableOpacity>
-          )}
+
+            <CodeField
+              value={code}
+              onChangeText={setCode}
+              cellCount={5}
+              rootStyle={styles.codeFieldRoot}
+              keyboardType="number-pad"
+              renderCell={({ index, symbol }) => (
+                <View key={index} style={[styles.cell]}>
+                  <Text style={styles.cellSymbol}>{symbol}</Text>
+                </View>
+              )}
+            />
+
+            {!isCodeResendable ? (
+              <Text style={styles.codeResetInactive}>
+                Отправить код заново через {timeLeft} сек
+              </Text>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setTimeLeft(50);
+                  setIsCodeResendable(false);
+                }}
+              >
+                <Text style={styles.codeResendActive}>
+                  Отправить код еще раз
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
-    </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback>
+    </GestureDetector>
   );
 };
 
@@ -96,6 +113,7 @@ const styles = StyleSheet.create({
   stepContainer: {
     height: "100%",
     alignItems: "center",
+    position: "relative",
   },
   caption: {
     color: colors.maintext,

@@ -7,6 +7,7 @@ import { Step3 } from "@/components/auth/steps/Step3";
 import { PhoneProvider } from "@/context/PhoneContext";
 import { useAuthSteps } from "@/hooks/auth/useAuthSteps";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function authHandler() {
   // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -19,17 +20,19 @@ export default function authHandler() {
   ];
 
   return (
-    <PhoneProvider>
-      <View
-        style={{
-          flex: 1,
-          position: "relative",
-          backgroundColor: colors.background,
-        }}
-      >
-        <AuthCarousel currentIndex={currentStep}>{steps}</AuthCarousel>
-        <AuthBullets currentStep={currentStep} totalSteps={totalSteps} />
-      </View>
-    </PhoneProvider>
+    <GestureHandlerRootView>
+      <PhoneProvider>
+        <View
+          style={{
+            flex: 1,
+            position: "relative",
+            backgroundColor: colors.background,
+          }}
+        >
+          <AuthCarousel currentIndex={currentStep}>{steps}</AuthCarousel>
+          <AuthBullets currentStep={currentStep} totalSteps={totalSteps} />
+        </View>
+      </PhoneProvider>
+    </GestureHandlerRootView>
   );
 }
