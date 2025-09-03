@@ -44,6 +44,20 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
     return () => clearTimeout(timer);
   }, [timeLeft]);
 
+  useEffect(() => {
+    if (code.length === 5) {
+      // checkCode()
+      Keyboard.dismiss();
+      setTimeout(() => {
+        onNext();
+      }, 500);
+      setTimeout(() => {
+        setCode("");
+      }, 1000);
+      return;
+    }
+  }, [code, onNext]);
+
   return (
     <GestureDetector gesture={swipeBack}>
       <TouchableWithoutFeedback
@@ -51,9 +65,6 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
         onPress={() => Keyboard.dismiss()}
       >
         <View style={styles.stepContainer}>
-          <TouchableOpacity>
-            <Text></Text>
-          </TouchableOpacity>
           <Text style={styles.caption}>Проверка телефона</Text>
           <View style={styles.informationContainer}>
             <Image
