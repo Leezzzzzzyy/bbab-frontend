@@ -10,10 +10,27 @@ import {
   View,
 } from "react-native";
 import AvatarPicker from "../AvatarPicker";
+import { ErrorToast } from "../ErrorToast";
 
 export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [username, setUsername] = useState<string>("");
   const [name, setName] = useState<string>("");
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleErrorHide = () => {
+    setErrorMessage(null);
+  };
+
+  const endAuthorization = () => {
+    if (username.length < 3) {
+      setErrorMessage("Название аккаунта меньше 4-х символов");
+    } else if (name.length < 2) {
+      setErrorMessage("Имя пользователя меньше 3-х символов");
+    }
+
+    return;
+  };
 
   return (
     <TouchableWithoutFeedback
@@ -21,6 +38,13 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       onPress={() => Keyboard.dismiss()}
     >
       <View style={styles.stepContainer}>
+        <ErrorToast
+          message={errorMessage || ""}
+          isVisible={!!errorMessage}
+          onHide={handleErrorHide}
+          duration={5000}
+        />
+
         <Text style={styles.caption}>Настройка профиля</Text>
         <View style={styles.inputContainerWrapper}>
           <AvatarPicker />
@@ -41,7 +65,10 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             />
           </View>
         </View>
-        <TouchableOpacity onPress={() => null} style={styles.endAuthButton}>
+        <TouchableOpacity
+          onPress={endAuthorization}
+          style={styles.endAuthButton}
+        >
           <Text style={styles.endAuthText}>ЗАВЕРШИТЬ</Text>
         </TouchableOpacity>
       </View>
