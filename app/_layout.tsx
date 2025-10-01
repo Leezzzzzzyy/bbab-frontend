@@ -16,7 +16,7 @@ export default function RootLayout() {
         useNativeDriver: true,
       }).start(() => {
         setIsLoading(false);
-        router.replace("/(auth)");
+        router.replace("/messages");
       });
     }, 2000);
 
