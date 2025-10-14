@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { CodeField } from "react-native-confirmation-code-field";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { ErrorToast } from "../ErrorToast";
 
 export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   onNext,
@@ -21,6 +22,8 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   const [code, setCode] = useState<string>("");
   const [isCodeResendable, setIsCodeResendable] = useState<boolean>(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const swipeBack = Gesture.Pan()
     .minDistance(20)
@@ -46,7 +49,16 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
 
   useEffect(() => {
     if (code.length === 5) {
-      // checkCode()
+      if (code !== "25863") {
+        setErrorMessage("Код подтверждения неверен");
+
+        setTimeout(() => {
+          setCode("");
+        }, 1000);
+
+        return;
+      }
+
       Keyboard.dismiss();
       setTimeout(() => {
         onNext();
@@ -58,6 +70,10 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
     }
   }, [code, onNext]);
 
+  const handleErrorHide = () => {
+    setErrorMessage(null);
+  };
+
   return (
     <GestureDetector gesture={swipeBack}>
       <TouchableWithoutFeedback
@@ -65,6 +81,13 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
         onPress={() => Keyboard.dismiss()}
       >
         <View style={styles.stepContainer}>
+          <ErrorToast
+            message={errorMessage || ""}
+            isVisible={!!errorMessage}
+            onHide={handleErrorHide}
+            duration={5000}
+          />
+
           <Text style={styles.caption}>Проверка телефона</Text>
           <View style={styles.informationContainer}>
             <Image
