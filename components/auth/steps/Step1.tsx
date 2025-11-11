@@ -1,6 +1,7 @@
 import colors from "@/assets/colors";
 import { useAppFonts } from "@/assets/fonts/useFonts";
 import { usePhone } from "@/context/PhoneContext";
+import { authAPI } from "@/services/api";
 import { useRef, useState } from "react";
 import {
   Image,
@@ -16,6 +17,8 @@ import {
 export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { fontsLoadded } = useAppFonts();
   const [viewedPhoneNumber, setViewedPhoneNumber] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   const { setPhoneNumber } = usePhone();

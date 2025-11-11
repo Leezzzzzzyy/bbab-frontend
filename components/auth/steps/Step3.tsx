@@ -1,4 +1,6 @@
 import colors from "@/assets/colors";
+import { usePhone } from "@/context/PhoneContext";
+import { authAPI } from "@/services/api";
 import { useState } from "react";
 import {
   Keyboard,
@@ -13,8 +15,10 @@ import AvatarPicker from "../AvatarPicker";
 import { ErrorToast } from "../ErrorToast";
 
 export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const { phoneNumber } = usePhone();
   const [username, setUsername] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -22,14 +26,30 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setErrorMessage(null);
   };
 
-  const endAuthorization = () => {
+  const endAuthorization = async () => {
     if (username.length < 3) {
       setErrorMessage("Название аккаунта меньше 4-х символов");
+      return;
     } else if (name.length < 2) {
       setErrorMessage("Имя пользователя меньше 3-х символов");
+      return;
     }
 
-    return;
+    setIsLoading(true);
+    try {
+      const response = await authAPI.confirmLogin({
+        phone: `+7${phoneNumber}`,
+        code: "25863", // This should come from Step2, but using hardcoded for now
+        username: username,
+      });
+      // Token received, save it and navigate to main app
+      console.log("Login successful, token:", response.token);
+      // TODO: Save token to secure storage and navigate to main app
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Ошибка при входе");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

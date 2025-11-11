@@ -1,4 +1,5 @@
 import { AppState } from "react-native";
+import { chatAPI, type Message as APIMessage, type ListChatsResponse } from "./api";
 
 export type Message = {
   id: string;

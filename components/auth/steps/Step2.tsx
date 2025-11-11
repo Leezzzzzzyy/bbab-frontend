@@ -1,5 +1,6 @@
 import colors from "@/assets/colors";
 import { usePhone } from "@/context/PhoneContext";
+import { authAPI } from "@/services/api";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -22,6 +23,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   const [code, setCode] = useState<string>("");
   const [isCodeResendable, setIsCodeResendable] = useState<boolean>(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
