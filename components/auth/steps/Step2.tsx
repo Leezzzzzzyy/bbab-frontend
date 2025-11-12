@@ -61,6 +61,9 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
         return;
       }
 
+      // Save confirmation code to context
+      setConfirmationCode(code);
+
       Keyboard.dismiss();
       setTimeout(() => {
         onNext();
@@ -70,7 +73,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
       }, 1000);
       return;
     }
-  }, [code, onNext]);
+  }, [code, onNext, setConfirmationCode]);
 
   const handleErrorHide = () => {
     setErrorMessage(null);
@@ -115,6 +118,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
               cellCount={5}
               rootStyle={styles.codeFieldRoot}
               keyboardType="number-pad"
+              autoFocus={true}
               renderCell={({ index, symbol }) => (
                 <View key={index} style={[styles.cell]}>
                   <Text style={styles.cellSymbol}>{symbol}</Text>

@@ -31,7 +31,7 @@ export const AuthCarousel: React.FC<AuthCarouselProps> = ({
   }));
 
   return (
-    <SafeAreaView>
+    <SafeAreaView style={styles.safeArea}>
       <Animated.View style={[styles.carousel, animatedStyle]}>
         {children.map((child, index) => (
           <View key={index} style={styles.slide}>
@@ -44,10 +44,15 @@ export const AuthCarousel: React.FC<AuthCarouselProps> = ({
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+  //   flex: 1,
+  },
   carousel: {
     flexDirection: "row",
+    flex: 1,
   },
   slide: {
     width: width,
+    // flex: 1,
   },
 });

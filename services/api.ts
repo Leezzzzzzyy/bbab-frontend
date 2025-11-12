@@ -1,10 +1,10 @@
 /**
  * API Service for BBBAB Messenger
  * Handles all HTTP requests to the backend API
- * Base URL: http://localhost:8080/api
+ * Base URL: http://94.241.170.140:8080/api
  */
+import {API_BASE_URL} from "@/config/environment";
 
-const API_BASE_URL = "http://localhost:8080/api";
 
 // ============================================================================
 // Types
@@ -393,7 +393,7 @@ export const chatAPI = {
    */
   connectWebSocket: (chatId: number, token: string): WebSocket => {
     const wsProtocol = "ws://"; // Use wss:// for production
-    const wsUrl = `${wsProtocol}localhost:8080/api/chat/${chatId}/ws`;
+    const wsUrl = `${wsProtocol}94.241.170.140:8080/api/chat/${chatId}/ws`;
     const ws = new WebSocket(wsUrl);
 
     // Set authorization header (note: WebSocket doesn't support custom headers in all environments)

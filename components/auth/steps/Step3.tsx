@@ -1,6 +1,8 @@
 import colors from "@/assets/colors";
+import { useAuth } from "@/context";
 import { usePhone } from "@/context/PhoneContext";
 import { authAPI } from "@/services/api";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Keyboard,
@@ -15,7 +17,9 @@ import AvatarPicker from "../AvatarPicker";
 import { ErrorToast } from "../ErrorToast";
 
 export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { phoneNumber } = usePhone();
+  const { phoneNumber, confirmationCode } = usePhone();
+  const { setCredentials } = useAuth();
+  const router = useRouter();
   const [username, setUsername] = useState<string>("");
   const [name, setName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -39,12 +43,21 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     try {
       const response = await authAPI.confirmLogin({
         phone: `+7${phoneNumber}`,
-        code: "25863", // This should come from Step2, but using hardcoded for now
+        code: confirmationCode || "25863", // Use saved code or fallback
         username: username,
       });
       // Token received, save it and navigate to main app
       console.log("Login successful, token:", response.token);
-      // TODO: Save token to secure storage and navigate to main app
+
+      // Save credentials to storage
+      await setCredentials({
+        token: response.token,
+        username: username,
+        phone: `+7${phoneNumber}`,
+      });
+
+      // Navigate to main app
+      router.replace("/messages");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Ошибка при входе");
     } finally {
