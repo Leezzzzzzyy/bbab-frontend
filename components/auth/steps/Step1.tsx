@@ -1,7 +1,7 @@
 import colors from "@/assets/colors";
 import { useAppFonts } from "@/assets/fonts/useFonts";
 import { usePhone } from "@/context/PhoneContext";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   Keyboard,
@@ -16,7 +16,7 @@ import {
 export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { fontsLoadded } = useAppFonts();
   const [viewedPhoneNumber, setViewedPhoneNumber] = useState("");
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInput>(null); // Зачем
 
   const { setPhoneNumber } = usePhone();
 

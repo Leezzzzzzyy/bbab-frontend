@@ -44,7 +44,7 @@ const AvatarPicker = () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
       allowsEditing: true,
-      aspect: [1, 1], // Квадратное для аватара
+      aspect: [1, 1],
       quality: 0.8,
     });
 

@@ -1,5 +1,5 @@
 import colors from "@/assets/colors";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Keyboard,
   StyleSheet,

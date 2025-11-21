@@ -1,5 +1,6 @@
 import colors from "@/assets/colors";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
+
 import { Animated, StyleSheet, View } from "react-native";
 
 interface AuthBulletsProps {
@@ -11,25 +12,22 @@ export const AuthBullets: React.FC<AuthBulletsProps> = ({
   currentStep,
   totalSteps,
 }) => {
-  // Создаем массив анимированных значений для каждой точки
   const colorAnims = useRef(
     Array.from({ length: totalSteps }, () => new Animated.Value(0))
   ).current;
 
   useEffect(() => {
-    // Анимируем изменение цвета для всех точек
     colorAnims.forEach((anim, index) => {
       const toValue = index === currentStep ? 1 : 0;
 
       Animated.timing(anim, {
         toValue,
-        duration: 300, // Длительность анимации в миллисекундах
-        useNativeDriver: false, // useNativeDriver должен быть false для анимации цвета
+        duration: 300,
+        useNativeDriver: false,
       }).start();
     });
   }, [colorAnims, currentStep, totalSteps]);
 
-  // Интерполяция цвета для плавного перехода
   const getBulletColor = (anim: Animated.Value) => {
     return anim.interpolate({
       inputRange: [0, 1],
