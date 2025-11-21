@@ -1,53 +1,51 @@
 import React from "react";
-import { Dimensions, SafeAreaView, StyleSheet, View } from "react-native";
+import {SafeAreaView, StyleSheet} from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+    FadeIn,
+    FadeOut,
 } from "react-native-reanimated";
 
-const { width } = Dimensions.get("window");
-console.log(width);
-
 interface AuthCarouselProps {
-  children: React.ReactNode[];
-  currentIndex: number;
+    children: React.ReactNode;
+    currentIndex: number;
 }
 
 export const AuthCarousel: React.FC<AuthCarouselProps> = ({
-  children,
-  currentIndex,
-}) => {
-  const translateX = useSharedValue(0);
+                                                              children,
+                                                              currentIndex,
+                                                          }) => {
+    const opacity = useSharedValue(1);
 
-  React.useEffect(() => {
-    translateX.value = withTiming(-currentIndex * width, {
-      duration: 500,
-    });
-  }, [currentIndex, translateX]);
+    React.useEffect(() => {
+        opacity.value = 0;
+        opacity.value = withTiming(1, {duration: 300});
+    }, [currentIndex, opacity]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
 
-  return (
-    <SafeAreaView>
-      <Animated.View style={[styles.carousel, animatedStyle]}>
-        {children.map((child, index) => (
-          <View key={index} style={styles.slide}>
-            {child}
-          </View>
-        ))}
-      </Animated.View>
-    </SafeAreaView>
-  );
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <Animated.View
+                style={[styles.container, animatedStyle]}
+                entering={FadeIn.duration(300)}
+                exiting={FadeOut.duration(200)}
+            >
+                {children}
+            </Animated.View>
+        </SafeAreaView>
+    );
 };
 
 const styles = StyleSheet.create({
-  carousel: {
-    flexDirection: "row",
-  },
-  slide: {
-    width: width,
-  },
+    safeArea: {
+        flex: 1,
+    },
+    container: {
+        flex: 1,
+    },
 });

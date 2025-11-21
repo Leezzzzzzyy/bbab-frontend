@@ -1,22 +1,18 @@
 import colors from "@/assets/colors";
-import { useAppFonts } from "@/assets/fonts/useFonts";
 import { usePhone } from "@/context/PhoneContext";
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Image,
-  Keyboard,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
 export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const { fontsLoadded } = useAppFonts();
   const [viewedPhoneNumber, setViewedPhoneNumber] = useState("");
-  const inputRef = useRef<TextInput>(null); // Зачем
+  const inputRef = useRef<TextInput>(null);
 
   const { setPhoneNumber } = usePhone();
 
@@ -54,75 +50,67 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     const cleanNumber = viewedPhoneNumber.replace(/\D/g, "");
     setPhoneNumber(cleanNumber);
     console.log(cleanNumber);
-    Keyboard.dismiss();
     onNext();
   };
 
   return (
-    <TouchableWithoutFeedback
-      onPress={() => Keyboard.dismiss()}
-      accessible={false}
-    >
-      <View style={styles.stepContainer}>
-        <Text style={styles.caption}>Ваш номер телефона</Text>
-        <View style={styles.countryContainer}>
-          <Image
-            source={require("@/assets/images/RussianFlag.png")}
-            style={styles.flag}
+    <View style={styles.stepContainer}>
+      <Text style={styles.caption}>Ваш номер телефона</Text>
+      <View style={styles.countryContainer}>
+        <Image
+          source={require("@/assets/images/RussianFlag.png")}
+          style={styles.flag}
+        />
+        <Text style={styles.countryName}>Россия</Text>
+      </View>
+      <View style={styles.phoneInputWrapper}>
+        <View style={styles.phoneCountryStart}>
+          <Text style={styles.phoneCountryNumber}>+7</Text>
+        </View>
+        <View style={styles.inputFieldWrapper}>
+          <TextInput
+            ref={inputRef}
+            style={styles.inputField}
+            value={viewedPhoneNumber}
+            onChangeText={handlePhoneChange}
+            placeholder="(999) 123-45-67"
+            placeholderTextColor={colors.additionalText + "60"}
+            keyboardType="phone-pad"
+            autoFocus={true}
+            maxLength={16}
           />
-          <Text style={styles.countryName}>Россия</Text>
-        </View>
-        <View style={styles.phoneInputWrapper}>
-          <View style={styles.phoneCountryStart}>
-            <Text style={styles.phoneCountryNumber}>+7</Text>
-          </View>
-          <View style={styles.inputFieldWrapper}>
-            <TextInput
-              ref={inputRef}
-              style={styles.inputField}
-              value={viewedPhoneNumber}
-              onChangeText={handlePhoneChange}
-              placeholder="(999) 123-45-67"
-              placeholderTextColor={colors.maintext + "40"}
-              keyboardType="phone-pad"
-              autoFocus={true}
-              maxLength={16}
-            />
-          </View>
-        </View>
-
-        <View style={styles.continueContainer}>
-          <TouchableOpacity
-            onPress={() => handlePhone()}
-            style={
-              viewedPhoneNumber.length < 15
-                ? styles.continueButtonInactive
-                : styles.continueButton
-            }
-            disabled={viewedPhoneNumber.length < 15}
-          >
-            <Text style={styles.continueText}>ПРОДОЛЖИТЬ</Text>
-          </TouchableOpacity>
-          <Text style={styles.registrationNotation}>
-            Регистрируюясь, вы принимаете
-          </Text>
-          <TouchableOpacity
-            onPress={() => onNext()}
-            style={styles.agreementButton}
-          >
-            <Text style={styles.agreementText}>
-              Пользовательское соглашение
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
-    </TouchableWithoutFeedback>
+
+      <View style={styles.continueContainer}>
+        <TouchableOpacity
+          onPress={() => handlePhone()}
+          style={
+            viewedPhoneNumber.length < 15
+              ? styles.continueButtonInactive
+              : styles.continueButton
+          }
+          disabled={viewedPhoneNumber.length < 15}
+        >
+          <Text style={styles.continueText}>ПРОДОЛЖИТЬ</Text>
+        </TouchableOpacity>
+        <Text style={styles.registrationNotation}>
+          Регистрируюсь, вы принимаете
+        </Text>
+        <TouchableOpacity
+          onPress={() => onNext()}
+          style={styles.agreementButton}
+        >
+          <Text style={styles.agreementText}>Пользовательское соглашение</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   stepContainer: {
-    height: "100%",
+    flex: 1,
     alignItems: "center",
   },
   caption: {

@@ -6,7 +6,6 @@ import { Step2 } from "@/components/auth/steps/Step2";
 import { Step3 } from "@/components/auth/steps/Step3";
 import { PhoneProvider } from "@/context/PhoneContext";
 import { useAuthSteps } from "@/hooks/auth/useAuthSteps";
-import React from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -14,14 +13,22 @@ export default function authHandler() {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const { currentStep, nextStep, prevStep, totalSteps } = useAuthSteps();
 
-  const steps = [
-    <Step1 onNext={nextStep} key="step1" />,
-    <Step2 onNext={nextStep} onBack={prevStep} key="step2" />,
-    <Step3 onBack={prevStep} key="step3" />,
-  ];
+  // Рендерим только текущий шаг
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 0:
+        return <Step1 key="step1" onNext={nextStep} />;
+      case 1:
+        return <Step2 key="step2" onNext={nextStep} onBack={prevStep} />;
+      case 2:
+        return <Step3 key="step3" onBack={prevStep} />;
+      default:
+        return <Step1 key="step1" onNext={nextStep} />;
+    }
+  };
 
   return (
-    <GestureHandlerRootView>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <PhoneProvider>
         <View
           style={{
@@ -30,7 +37,9 @@ export default function authHandler() {
             backgroundColor: colors.background,
           }}
         >
-          <AuthCarousel currentIndex={currentStep}>{steps}</AuthCarousel>
+          <AuthCarousel currentIndex={currentStep}>
+            {renderCurrentStep()}
+          </AuthCarousel>
           <AuthBullets currentStep={currentStep} totalSteps={totalSteps} />
         </View>
       </PhoneProvider>

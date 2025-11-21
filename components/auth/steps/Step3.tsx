@@ -1,5 +1,9 @@
 import colors from "@/assets/colors";
-import React, { useState } from "react";
+import { useAuth } from "@/context";
+import { usePhone } from "@/context/PhoneContext";
+import { authAPI } from "@/services/api";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Keyboard,
   StyleSheet,
@@ -10,10 +14,58 @@ import {
   View,
 } from "react-native";
 import AvatarPicker from "../AvatarPicker";
+import { ErrorToast } from "../ErrorToast";
 
 export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const { phoneNumber, confirmationCode } = usePhone();
+  const { setCredentials } = useAuth();
+  const router = useRouter();
   const [username, setUsername] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleErrorHide = () => {
+    setErrorMessage(null);
+  };
+
+  const endAuthorization = async () => {
+    if (username.length < 3) {
+      setErrorMessage("Название аккаунта меньше 4-х символов");
+      return;
+    } else if (name.length < 2) {
+      setErrorMessage("Имя пользователя меньше 3-х символов");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await authAPI.confirmLogin({
+        phone: `+7${phoneNumber}`,
+        code: confirmationCode || "25863", // Use saved code or fallback
+        username: username,
+      });
+      // Token received, save it and navigate to main app
+      console.log("Login successful, token:", response.token);
+
+      // Save credentials to storage
+      await setCredentials({
+        token: response.token,
+        username: username,
+        phone: `+7${phoneNumber}`,
+      });
+
+      // Navigate to main app
+      router.replace("/messages");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Ошибка при входе"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <TouchableWithoutFeedback
@@ -21,27 +73,37 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       onPress={() => Keyboard.dismiss()}
     >
       <View style={styles.stepContainer}>
+        <ErrorToast
+          message={errorMessage || ""}
+          isVisible={!!errorMessage}
+          onHide={handleErrorHide}
+          duration={5000}
+        />
+
         <Text style={styles.caption}>Настройка профиля</Text>
         <View style={styles.inputContainerWrapper}>
           <AvatarPicker />
           <View style={styles.inputsContainer}>
             <TextInput
               style={styles.inputField}
-              placeholderTextColor={colors.additionalText + "40"}
+              placeholderTextColor={colors.additionalText + "60"}
               value={username}
               onChangeText={setUsername}
               placeholder="Название аккаунта"
             />
             <TextInput
               style={styles.inputField}
-              placeholderTextColor={colors.additionalText + "40"}
+              placeholderTextColor={colors.additionalText + "60"}
               value={name}
               onChangeText={setName}
               placeholder="Имя"
             />
           </View>
         </View>
-        <TouchableOpacity onPress={() => null} style={styles.endAuthButton}>
+        <TouchableOpacity
+          onPress={endAuthorization}
+          style={styles.endAuthButton}
+        >
           <Text style={styles.endAuthText}>ЗАВЕРШИТЬ</Text>
         </TouchableOpacity>
       </View>
@@ -51,7 +113,7 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 const styles = StyleSheet.create({
   stepContainer: {
-    height: "100%",
+    flex: 1,
     alignItems: "center",
     position: "relative",
   },

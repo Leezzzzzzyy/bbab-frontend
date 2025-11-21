@@ -1,15 +1,18 @@
 import colors from "@/assets/colors";
+import { AuthProvider, useAuth } from "@/context";
 import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-
+import { useEffect, useState } from "react";
 import { Animated } from "react-native";
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const router = useRouter();
   const fadeAnim = useState(new Animated.Value(1))[0];
+  const { isSignedIn, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
+
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -17,12 +20,14 @@ export default function RootLayout() {
         useNativeDriver: true,
       }).start(() => {
         setIsLoading(false);
-        router.replace("/(auth)");
+        // Navigate to appropriate screen based on auth status
+        const targetRoute = isSignedIn ? "/messages" : "/(auth)";
+        router.replace(targetRoute);
       });
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [router, fadeAnim]);
+  }, [router, fadeAnim, isSignedIn, authLoading]);
 
   return (
     <>
@@ -63,5 +68,13 @@ export default function RootLayout() {
         </Animated.View>
       )}
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutContent />
+    </AuthProvider>
   );
 }
