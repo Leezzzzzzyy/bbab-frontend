@@ -3,7 +3,7 @@ import { useAuth } from "@/context";
 import { usePhone } from "@/context/PhoneContext";
 import { authAPI } from "@/services/api";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Keyboard,
   StyleSheet,

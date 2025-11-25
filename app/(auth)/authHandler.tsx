@@ -6,6 +6,7 @@ import { Step2 } from "@/components/auth/steps/Step2";
 import { Step3 } from "@/components/auth/steps/Step3";
 import { PhoneProvider } from "@/context/PhoneContext";
 import { useAuthSteps } from "@/hooks/auth/useAuthSteps";
+import React from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 

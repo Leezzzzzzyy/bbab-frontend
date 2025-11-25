@@ -1,6 +1,6 @@
 import colors from "@/assets/colors";
 import { usePhone } from "@/context/PhoneContext";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   StyleSheet,

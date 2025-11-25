@@ -1,7 +1,7 @@
 import colors from "@/assets/colors";
 import { AuthProvider, useAuth } from "@/context";
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated } from "react-native";
 
 function RootLayoutContent() {
