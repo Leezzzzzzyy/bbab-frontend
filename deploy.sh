@@ -28,12 +28,12 @@ echo
 
 
 git fetch --all --prune
-git reset --hard origin/
+git reset --hard origin/master
 
 # Install dependencies
 echo "Installing dependencies..."
 if [ -f "./package-lock.json" ] && command -v npm >/dev/null 2>&1; then
-  run_in_app "npm ci --unsafe-perm"
+  npm ci --unsafe-perm
 fi
 
 # Build step
