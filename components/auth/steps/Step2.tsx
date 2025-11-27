@@ -47,16 +47,16 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   }, [timeLeft]);
 
   useEffect(() => {
-    if (code.length === 5) {
-      if (code !== "25863") {
-        setErrorMessage("Код подтверждения неверен");
+    if (code.length === 4) {
+      // if (code !== "25863") {
+      //   setErrorMessage("Код подтверждения неверен");
 
-        setTimeout(() => {
-          setCode("");
-        }, 1000);
+      //   setTimeout(() => {
+      //     setCode("");
+      //   }, 1000);
 
-        return;
-      }
+      //   return;
+      // }
 
       // Save confirmation code to context
       setConfirmationCode(code);
@@ -108,7 +108,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
           <CodeField
             value={code}
             onChangeText={setCode}
-            cellCount={5}
+            cellCount={4}
             rootStyle={styles.codeFieldRoot}
             keyboardType="number-pad"
             autoFocus={true}

@@ -1,5 +1,6 @@
 import colors from "@/assets/colors";
 import { usePhone } from "@/context/PhoneContext";
+import { authAPI } from "@/services";
 import React, { useRef, useState } from "react";
 import {
   Image,
@@ -46,10 +47,21 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     setViewedPhoneNumber(formatted);
   };
 
-  const handlePhone = () => {
+  const handlePhone = async () => {
     const cleanNumber = viewedPhoneNumber.replace(/\D/g, "");
     setPhoneNumber(cleanNumber);
     console.log(cleanNumber);
+
+    try {
+      const response = await authAPI.initLogin({
+        phone: cleanNumber,
+      });
+
+      console.log(response.message);
+    } catch (error) {
+      console.log(error);
+    }
+
     onNext();
   };
 

@@ -22,7 +22,7 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const router = useRouter();
   const [username, setUsername] = useState<string>("");
   const [name, setName] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -39,11 +39,11 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       return;
     }
 
-    setIsLoading(true);
+    // setIsLoading(true);
     try {
       const response = await authAPI.confirmLogin({
-        phone: `+7${phoneNumber}`,
-        code: confirmationCode || "25863", // Use saved code or fallback
+        phone: `${phoneNumber}`,
+        code: confirmationCode, // Use saved code or fallback
         username: username,
       });
       // Token received, save it and navigate to main app
@@ -63,7 +63,7 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         error instanceof Error ? error.message : "Ошибка при входе"
       );
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false);
     }
   };
 
