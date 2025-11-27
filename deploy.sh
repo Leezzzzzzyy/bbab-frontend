@@ -13,25 +13,22 @@ set -euo pipefail
 # Configure by exporting env vars or editing the defaults below.
 
 # --- CONFIG (edit or export before running) ---
-GIT_REPO="${GIT_REPO:-https://github.com/Leezzzzzzyy/bbab-frontend.git}"                 # required: git repo URL, e.g. git@github.com:owner/repo.git
-GIT_BRANCH="${GIT_BRANCH:-master}"         # branch to deploy
-DEPLOY_BASE="${DEPLOY_BASE:-/srv/apps/myapp}"   # working area where repo is checked out
-APP_DIR="${APP_DIR:-${DEPLOY_BASE}/repo}"       # actual repo path
+APP_DIR="${APP_DIR:-.}"                   # current directory (default: .)
+GIT_BRANCH="${GIT_BRANCH:-}"              # branch to deploy (leave empty to use current branch)
 REMOTE_PATH="${REMOTE_PATH:-/var/www/myapp}"    # where built static files will be served from
 BUILD_DIR="${BUILD_DIR:-dist}"     # expected build output dir relative to APP_DIR
-BUILD_CMD="${BUILD_CMD:-npx expo export expo export --platform 'web'}"              # if set, this command will be used to build
+BUILD_CMD="${BUILD_CMD:-npx expo export --platform 'web'}"              # if set, this command will be used to build
 NODE_ENV="${NODE_ENV:-production}"      # NODE_ENV for build
 NPM_CMD="${NPM_CMD:-npm}"               # npm or yarn
-KEEP_DEPLOY_HISTORY="${KEEP_DEPLOY_HISTORY:-3}" # number of past clones kept (unused here, placeholder)
 # --- end config ---
 
-if [ -z "${GIT_REPO}" ]; then
-  echo "ERROR: GIT_REPO is not set. Export GIT_REPO=git@github.com:owner/repo.git and re-run."
+# Validate git repository
+if [ ! -d "${APP_DIR}/.git" ]; then
+  echo "ERROR: ${APP_DIR} is not a git repository. Please run this script from the project root."
   exit 2
 fi
 
 echo "Starting server-side deploy: $(date)"
-echo "Repo: ${GIT_REPO}  Branch: ${GIT_BRANCH}"
 echo "App dir: ${APP_DIR}"
 echo "Build dir (relative): ${BUILD_DIR}"
 echo "Publish target: ${REMOTE_PATH}"
@@ -42,19 +39,14 @@ run_in_app() {
   (cd "${APP_DIR}" && eval "$*")
 }
 
-# Ensure DEPLOY_BASE exists and is writeable
-mkdir -p "${DEPLOY_BASE}"
-chown "$(id -u):$(id -g)" "${DEPLOY_BASE}" || true
-
-# Clone or update repository
-if [ ! -d "${APP_DIR}/.git" ]; then
-  echo "Cloning repository..."
-  git clone --branch "${GIT_BRANCH}" --depth 1 "${GIT_REPO}" "${APP_DIR}"
-else
-  echo "Updating existing repository..."
+# Update current git branch if specified
+if [ -n "${GIT_BRANCH}" ]; then
+  echo "Checking out branch: ${GIT_BRANCH}..."
   run_in_app "git fetch --all --prune"
   run_in_app "git checkout --force ${GIT_BRANCH}"
   run_in_app "git reset --hard origin/${GIT_BRANCH}"
+else
+  echo "Using current git branch (no GIT_BRANCH specified)"
 fi
 
 # Ensure node is available
@@ -156,8 +148,8 @@ echo "Deploy completed: $(date)"
 echo "Served files at: ${REMOTE_PATH}"
 echo
 echo "Notes:"
-echo "- If the git repo is private, ensure the deploy user has the SSH key / credentials needed to fetch."
-echo "- To run manually: (on the deploy machine)"
-echo "    export GIT_REPO='git@github.com:owner/repo.git' GIT_BRANCH=main REMOTE_PATH=/var/www/myapp ./deploy.sh"
+echo "- This script runs in the current folder and uses the current git project."
+echo "- To deploy a different branch: export GIT_BRANCH=branch-name ./deploy.sh"
+echo "- To deploy to a different location: export REMOTE_PATH=/var/www/different-path ./deploy.sh"
 echo "- If your Expo web build for this version requires a different command, set BUILD_CMD before running."
 exit 0
