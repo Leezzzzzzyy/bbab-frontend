@@ -1,8 +1,11 @@
 import colors from "@/assets/colors";
+import { useAuth } from "@/context";
 import React from "react";
 import { Text, View } from "react-native";
 
 export default function ProfileScreen() {
+  const { credentials } = useAuth();
+
   return (
     <View
       style={{
@@ -51,17 +54,19 @@ export default function ProfileScreen() {
               fontSize: 28,
             }}
           >
-            A
+            {credentials?.username
+              ? credentials.username.slice(0, 1).toUpperCase()
+              : ""}
           </Text>
         </View>
 
         <Text
           style={{ color: colors.maintext, fontSize: 18, fontWeight: "700" }}
         >
-          Alex Developer
+          {credentials?.username ? credentials.username : "Без имени"}
         </Text>
         <Text style={{ color: colors.additionalText, marginTop: 6 }}>
-          alex@example.com
+          {credentials?.phone ? credentials.phone : "Без номера"}
         </Text>
       </View>
     </View>
