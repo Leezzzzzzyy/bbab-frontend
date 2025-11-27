@@ -28,11 +28,11 @@ echo
 
 
 git fetch --all --prune
-git reset --hard origin
+git reset --hard origin/
 
 # Install dependencies
 echo "Installing dependencies..."
-if [ -f "${APP_DIR}/package-lock.json" ] && command -v npm >/dev/null 2>&1; then
+if [ -f "./package-lock.json" ] && command -v npm >/dev/null 2>&1; then
   run_in_app "npm ci --unsafe-perm"
 fi
 
@@ -43,10 +43,10 @@ BUILD_SUCCESS=1
 npx expo export --platform 'web'
 
 # Confirm build output exists
-if [ ! -d "${APP_DIR}/${BUILD_DIR}" ]; then
-  echo "ERROR: build output directory not found: ${APP_DIR}/${BUILD_DIR}"
+if [ ! -d "./${BUILD_DIR}" ]; then
+  echo "ERROR: build output directory not found: ./${BUILD_DIR}"
   echo "List of files in app dir:"
-  ls -la "${APP_DIR}"
+  ls -la "."
   exit 5
 fi
 
@@ -54,7 +54,7 @@ fi
 echo "Publishing build to ${REMOTE_PATH} ..."
 mkdir -p "${REMOTE_PATH}"
 # Use rsync if available, otherwise use cp -r
-cp -a "${APP_DIR}/${BUILD_DIR}/." "${REMOTE_PATH}/"
+cp -a "./${BUILD_DIR}/." "${REMOTE_PATH}/"
 
 # Fix permissions for web server (www-data)
 echo "Fixing ownership/permissions (www-data:www-data)..."
