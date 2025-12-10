@@ -47,7 +47,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   }, [timeLeft]);
 
   useEffect(() => {
-    if (code.length === 4) {
+    if (code.length === 5) {
       // if (code !== "25863") {
       //   setErrorMessage("Код подтверждения неверен");
 
@@ -108,7 +108,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
           <CodeField
             value={code}
             onChangeText={setCode}
-            cellCount={4}
+            cellCount={5}
             rootStyle={styles.codeFieldRoot}
             keyboardType="number-pad"
             autoFocus={true}

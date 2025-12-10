@@ -3,7 +3,7 @@
  * Handles all HTTP requests to the backend API
  * Base URL: http://94.241.170.140:8080/api
  */
-import {API_BASE_URL} from "@/config/environment";
+import { API_BASE_URL } from "@/config/environment";
 
 
 // ============================================================================
@@ -57,6 +57,7 @@ export interface Chat {
 }
 
 export interface Message {
+    type: string;
     id: number;
     chatID: number;
     senderID: number;

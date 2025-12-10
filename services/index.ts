@@ -1,3 +1,5 @@
 // Barrel file for services
 export * from "./api";
-export {chatStore, currentUserId} from "./chat";
+export { chatStore, currentUserId } from "./chat";
+export * from "./websocket";
+

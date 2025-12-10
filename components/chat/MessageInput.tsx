@@ -1,10 +1,43 @@
 import colors from "@/assets/colors";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import React, {useCallback, useState} from "react";
-import {View, TextInput, Pressable, Keyboard} from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Keyboard, Pressable, TextInput, View } from "react-native";
 
-export default function MessageInput({onSend}: { onSend: (text: string) => void }) {
+export default function MessageInput({
+    onSend,
+    onTyping,
+}: {
+    onSend: (text: string) => void;
+    onTyping?: (isTyping: boolean) => void;
+}) {
     const [text, setText] = useState("");
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isTypingRef = useRef(false);
+
+    const handleTextChange = useCallback(
+        (newText: string) => {
+            setText(newText);
+            if (onTyping) {
+                const isTyping = newText.trim().length > 0;
+                if (isTyping && !isTypingRef.current) {
+                    isTypingRef.current = true;
+                    onTyping(true);
+                }
+                // Clear existing timeout
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                }
+                // Set timeout to stop typing indicator after 2 seconds of no typing
+                typingTimeoutRef.current = setTimeout(() => {
+                    if (isTypingRef.current) {
+                        isTypingRef.current = false;
+                        onTyping(false);
+                    }
+                }, 2000);
+            }
+        },
+        [onTyping]
+    );
 
     const submit = useCallback(() => {
         const value = text.trim();
@@ -12,7 +45,28 @@ export default function MessageInput({onSend}: { onSend: (text: string) => void 
         onSend(value);
         setText("");
         Keyboard.dismiss();
-    }, [onSend, text]);
+        // Stop typing indicator
+        if (onTyping && isTypingRef.current) {
+            isTypingRef.current = false;
+            onTyping(false);
+        }
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+    }, [onSend, onTyping, text]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+            if (onTyping && isTypingRef.current) {
+                onTyping(false);
+            }
+        };
+    }, [onTyping]);
 
     return (
         <View
@@ -30,7 +84,7 @@ export default function MessageInput({onSend}: { onSend: (text: string) => void 
                 placeholder="Message"
                 placeholderTextColor={colors.additionalText}
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleTextChange}
                 onSubmitEditing={submit}
                 multiline
                 style={{
