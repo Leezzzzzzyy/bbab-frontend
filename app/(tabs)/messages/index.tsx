@@ -1,22 +1,43 @@
 import colors from "@/assets/colors";
+import {chatStore, type Dialog} from "@/services/chat";
+import {useAuth} from "@/context/AuthContext";
+import {Link} from "expo-router";
+import React, {useEffect, useState} from "react";
+import {FlatList, Text, View, Pressable, ActivityIndicator, Alert} from "react-native";
 import UserSearch from "@/components/chat/UserSearch";
-import { chatStore, type Dialog } from "@/services/chat";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Link } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { FlatList, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
+import {  Modal, SafeAreaView, } from "react-native";
+
 
 export default function MessagesIndex() {
     const [dialogs, setDialogs] = useState<Dialog[]>(chatStore.listDialogs());
     const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const {credentials} = useAuth();
 
     useEffect(() => {
+        const loadDialogs = async () => {
+            if (!credentials?.token) return;
+            try {
+                setIsLoading(true);
+                await chatStore.loadDialogs(credentials.token);
+                setDialogs(chatStore.listDialogs());
+            } catch (error) {
+                console.error("Failed to load dialogs:", error);
+                Alert.alert("Error", "Failed to load chats. Please try again.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadDialogs();
+
         const off = chatStore.subscribeDialogs((d) => setDialogs(d.slice()));
         return () => off();
-    }, []);
+    }, [credentials?.token]);
 
     return (
-        <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
+        <SafeAreaView style={{flex: 1, backgroundColor: colors.background, padding: 16}}>
             <View style={{flex: 1, padding: 16}}>
                 <View
                     style={{
@@ -50,9 +71,14 @@ export default function MessagesIndex() {
                     </Pressable>
                 </View>
 
+            {isLoading ? (
+                <View style={{flex: 1, justifyContent: "center", alignItems: "center"}}>
+                    <ActivityIndicator color={colors.main} size="large" />
+                </View>
+            ) : (
                 <FlatList
                     data={dialogs}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item.id.toString()}
                     ItemSeparatorComponent={() => <View style={{height: 12}}/>}
                     renderItem={({item}) => (
                         <Link href={`/messages/${item.id}`} asChild>
@@ -86,47 +112,84 @@ export default function MessagesIndex() {
                             </Pressable>
                         </Link>
                     )}
-                />
-            </View>
-
-            <Modal
-                visible={isSearchModalVisible}
-                animationType="slide"
-                presentationStyle="pageSheet"
-                onRequestClose={() => setIsSearchModalVisible(false)}
-            >
-                <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: 16,
-                            borderBottomWidth: 1,
-                            borderBottomColor: "rgba(255,255,255,0.1)",
-                        }}
-                    >
+                    ListHeaderComponent={() => (
                         <Text
                             style={{
                                 color: colors.maintext,
-                                fontSize: 20,
-                                fontWeight: "700",
+                                fontSize: 22,
+                                fontWeight: "800",
+                                marginBottom: 12,
                             }}
                         >
-                            Новый чат
+                            Messages
                         </Text>
-                        <Pressable
-                            onPress={() => setIsSearchModalVisible(false)}
+                    )}
+                    ListEmptyComponent={() => (
+                        <View style={{
+                            flex: 1,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            paddingVertical: 40,
+                        }}>
+                            <Text style={{
+                                color: colors.additionalText,
+                                fontSize: 16,
+                                textAlign: "center",
+                            }}>
+                                No chats yet
+                            </Text>
+                            <Text style={{
+                                color: colors.additionalText,
+                                fontSize: 14,
+                                textAlign: "center",
+                                marginTop: 8,
+                            }}>
+                                Start a conversation to begin messaging
+                            </Text>
+                        </View>
+                    )}
+                />
+            )}
+                <Modal
+                    visible={isSearchModalVisible}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => setIsSearchModalVisible(false)}
+                >
+                    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
+                        <View
                             style={{
-                                padding: 8,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: 16,
+                                borderBottomWidth: 1,
+                                borderBottomColor: "rgba(255,255,255,0.1)",
                             }}
                         >
-                            <Ionicons name="close" size={24} color={colors.maintext}/>
-                        </Pressable>
-                    </View>
-                    <UserSearch onClose={() => setIsSearchModalVisible(false)}/>
-                </SafeAreaView>
-            </Modal>
+                            <Text
+                                style={{
+                                    color: colors.maintext,
+                                    fontSize: 20,
+                                    fontWeight: "700",
+                                }}
+                            >
+                                Новый чат
+                            </Text>
+                            <Pressable
+                                onPress={() => setIsSearchModalVisible(false)}
+                                style={{
+                                    padding: 8,
+                                }}
+                            >
+                                <Ionicons name="close" size={24} color={colors.maintext}/>
+                            </Pressable>
+                        </View>
+                        <UserSearch onClose={() => setIsSearchModalVisible(false)}/>
+                    </SafeAreaView>
+                </Modal>
+
         </SafeAreaView>
+
     );
 }

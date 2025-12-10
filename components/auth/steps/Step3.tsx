@@ -1,7 +1,8 @@
 import colors from "@/assets/colors";
 import { useAuth } from "@/context";
 import { usePhone } from "@/context/PhoneContext";
-import { authAPI } from "@/services/api";
+import { authAPI, userAPI } from "@/services/api";
+import { chatStore } from "@/services/chat";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -49,12 +50,20 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Token received, save it and navigate to main app
       console.log("Login successful, token:", response.token);
 
+      // Get current user info
+      const currentUser = await userAPI.getCurrentUser(response.token);
+      console.log("Current user:", currentUser);
+
       // Save credentials to storage
       await setCredentials({
         token: response.token,
         username: username,
+        userId: currentUser.id,
         phone: `+7${phoneNumber}`,
       });
+
+      // Initialize ChatStore with current user ID
+      chatStore.setCurrentUserId(currentUser.id);
 
       // Navigate to main app
       router.replace("/messages");

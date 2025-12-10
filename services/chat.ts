@@ -1,20 +1,43 @@
-import {AppState} from "react-native";
-import {chatAPI, type Message as APIMessage, type ListChatsResponse} from "./api";
+import { AppState } from "react-native";
+import { chatAPI, userAPI, type Message as APIMessage, type ListChatsResponse, type User } from "./api";
+import { WS_BASE_URL } from "@/config/environment";
 
 export type Message = {
-    id: string;
-    dialogId: string;
-    senderId: string;
+    id: number;
+    dialogId: number;
+    senderId: number;
     text: string;
     createdAt: number; // epoch ms
+    updatedAt?: number; // для edited сообщений
+    isDeleted?: boolean; // помечено ли как удаленное
+    readBy?: number[]; // ID пользователей которые прочитали
+};
+
+export type TypingUser = {
+    userId: number;
+    username: string;
+    isTyping: boolean;
 };
 
 export type Dialog = {
-    id: string;
+    id: number;
     name: string;
     lastMessage?: string;
     lastTime?: number;
     unreadCount?: number;
+};
+
+// WebSocket event types
+type WSMessage = {
+    type: string;
+    message?: string | any;
+    messages?: any[];
+    timestamp?: string;
+    message_id?: number;
+    user_id?: number;
+    username?: string;
+    chat_id?: number;
+    meta?: any;
 };
 
 type Listener<T> = (payload: T) => void;
@@ -43,66 +66,52 @@ class Emitter {
             try {
                 (fn as Listener<T>)(payload);
             } catch (e) {
-                // noop
+                console.error(`Error in emitter listener for event ${event}:`, e);
             }
         });
     }
 }
 
-export const currentUserId = "u0";
-
-function seedMessages() {
-    const names = [
-        {id: "1", name: "Alice"},
-        {id: "2", name: "Bob"},
-        {id: "3", name: "Charlie"},
-        {id: "4", name: "Diana"},
-    ];
-    const dialogs: Dialog[] = names.map((n) => ({id: n.id, name: n.name}));
-    const messages: Message[] = [];
-
-    const now = Date.now();
-    let counter = 1;
-    for (const d of dialogs) {
-        const base = now - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 7);
-        const count = 25 + Math.floor(Math.random() * 30);
-        for (let i = 0; i < count; i++) {
-            const isMe = Math.random() > 0.5;
-            messages.push({
-                id: `m${counter++}`,
-                dialogId: d.id,
-                senderId: isMe ? currentUserId : d.id,
-                text: isMe ? "Sounds good!" : "Hey there!",
-                createdAt: base + i * 1000 * 60 * (2 + Math.floor(Math.random() * 5)),
-            });
-        }
-    }
-    return {dialogs, messages};
-}
-
 const emitter = new Emitter();
+
+// User cache with TTL
+type CachedUser = {
+    data: User;
+    timestamp: number;
+};
 
 class ChatStore {
     dialogs: Dialog[] = [];
-    messagesByDialog = new Map<string, Message[]>();
+    messagesByDialog = new Map<number, Message[]>();
+    activeConnections = new Map<number, WebSocket>();
+    typingUsers = new Map<number, TypingUser[]>();
+    currentUserId: number | null = null;
+
+    // User cache with 5 minute TTL
+    private userCache = new Map<number, CachedUser>();
+    private readonly USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    // Reconnection logic
+    private reconnectTimers = new Map<number, NodeJS.Timeout>();
+    private reconnectAttempts = new Map<number, number>();
+    private readonly MAX_RECONNECT_ATTEMPTS = 10;
+    private readonly BASE_RECONNECT_DELAY = 1000; // 1 second
+
+    // WebSocket tokens for reconnection
+    private wsTokens = new Map<number, string>();
 
     constructor() {
-        const {dialogs, messages} = seedMessages();
-        this.dialogs = dialogs;
-        for (const d of dialogs) this.messagesByDialog.set(d.id, []);
-        for (const m of messages) {
-            const arr = this.messagesByDialog.get(m.dialogId)!;
-            arr.push(m);
-        }
-        for (const [id, arr] of this.messagesByDialog) {
-            arr.sort((a, b) => a.createdAt - b.createdAt);
-        }
+        // Load dialogs on demand via API
         this.recalcDialogSummaries();
 
-        // Example: update summaries when app returns to foreground (simulating sync)
+        // Update summaries when app returns to foreground
         AppState.addEventListener("change", (s) => {
             if (s === "active") this.recalcDialogSummaries();
         });
+    }
+
+    setCurrentUserId(userId: number) {
+        this.currentUserId = userId;
     }
 
     private recalcDialogSummaries() {
@@ -116,7 +125,6 @@ class ChatStore {
     }
 
     listDialogs(): Dialog[] {
-        // return copy sorted by lastTime desc
         return this.dialogs
             .slice()
             .sort((a, b) => (b.lastTime ?? 0) - (a.lastTime ?? 0));
@@ -126,14 +134,47 @@ class ChatStore {
         return emitter.on("dialogs:updated", cb);
     }
 
-    getMessages(dialogId: string, before?: number, limit = 20): {
+    async loadDialogs(token: string) {
+        try {
+            const chats = await chatAPI.listChats(token);
+            // Handle case when chats is null or not an array
+            if (!chats || !Array.isArray(chats)) {
+                this.dialogs = [];
+            } else {
+                this.dialogs = chats.map((chat) => ({
+                    id: chat.id,
+                    name: chat.name,
+                    lastMessage: chat.lastMessage?.message,
+                    lastTime: chat.lastMessage?.createdAt
+                        ? new Date(chat.lastMessage.createdAt).getTime()
+                        : undefined,
+                }));
+            }
+            for (const dialog of this.dialogs) {
+                if (!this.messagesByDialog.has(dialog.id)) {
+                    this.messagesByDialog.set(dialog.id, []);
+                }
+            }
+            this.recalcDialogSummaries();
+        } catch (error) {
+            console.error("Failed to load dialogs:", error);
+            // Set empty dialogs on error
+            this.dialogs = [];
+            this.recalcDialogSummaries();
+        }
+    }
+
+    getMessages(
+        dialogId: number,
+        before?: number,
+        limit = 20
+    ): {
         messages: Message[];
         hasMore: boolean;
-        nextCursor?: number
+        nextCursor?: number;
     } {
         const all = this.messagesByDialog.get(dialogId) ?? [];
-        // messages sorted asc; select a window ending before 'before'
-        let endIndex = all.length; // non-inclusive
+        let endIndex = all.length;
         if (before != null) {
             endIndex = all.findIndex((m) => m.createdAt >= before);
             if (endIndex === -1) endIndex = all.length;
@@ -142,27 +183,531 @@ class ChatStore {
         const slice = all.slice(startIndex, endIndex);
         const hasMore = startIndex > 0;
         const nextCursor = hasMore ? all[startIndex - 1].createdAt : undefined;
-        return {messages: slice, hasMore, nextCursor};
+        return { messages: slice, hasMore, nextCursor };
     }
 
-    subscribeMessages(dialogId: string, cb: Listener<Message>) {
+    subscribeMessages(dialogId: number, cb: Listener<Message>) {
         return emitter.on<Message>(`msg:${dialogId}`, cb);
     }
 
-    sendMessage(dialogId: string, text: string): Message {
-        const msg: Message = {
-            id: `m${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            dialogId,
-            senderId: currentUserId,
-            text: text.trim(),
-            createdAt: Date.now(),
-        };
+    subscribeStatus(dialogId: number, cb: Listener<string>) {
+        return emitter.on<string>(`chat:status:${dialogId}`, cb);
+    }
+
+    subscribeHistory(dialogId: number, cb: Listener<{ dialogId: number; messages: Message[] }>) {
+        return emitter.on<{ dialogId: number; messages: Message[] }>(`messages:history:${dialogId}`, cb);
+    }
+
+    /**
+     * Connect to chat WebSocket and load initial message history
+     */
+    async connectToChat(dialogId: number, token: string) {
+        try {
+            // Connect to WebSocket
+            this.connectWebSocket(dialogId, token);
+        } catch (error) {
+            console.error(`Failed to connect to chat ${dialogId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Load chat message history via REST API
+     */
+    private async loadChatMessages(dialogId: number, token: string) {
+        try {
+            const response = await chatAPI.getChat(dialogId, token);
+
+            console.log(`[ChatStore] GET /chat/${dialogId} returned ${Array.isArray(response) ? response.length : 0} records`);
+
+            if (!Array.isArray(response)) {
+                this.messagesByDialog.set(dialogId, []);
+                emitter.emit("messages:loaded", { dialogId, messages: [] });
+                return;
+            }
+
+            const messages = response
+                .map((msg) => {
+                    const timestamp =
+                        msg.Timestamp ?? msg.CreatedAt ?? msg.createdAt;
+                    return {
+                        id: msg.ID ?? msg.id ?? 0,
+                        dialogId: msg.chat_id ?? msg.chatID ?? dialogId,
+                        senderId: msg.sender_id ?? msg.senderID ?? 0,
+                        text: msg.message ?? msg.Message ?? "",
+                        createdAt: timestamp ? new Date(timestamp).getTime() : Date.now(),
+                        updatedAt: msg.UpdatedAt ? new Date(msg.UpdatedAt).getTime() : undefined,
+                        isDeleted: Boolean(msg.DeletedAt),
+                    } as Message;
+                })
+                .filter((msg): msg is Message => msg.id > 0);
+
+            // Sort messages by creation time (ascending)
+            messages.sort((a, b) => a.createdAt - b.createdAt);
+
+            this.messagesByDialog.set(dialogId, messages);
+            emitter.emit("messages:loaded", { dialogId, messages });
+        } catch (error) {
+            console.error(`Failed to load messages for chat ${dialogId}:`, error);
+            // Set empty messages array on error
+            this.messagesByDialog.set(dialogId, []);
+            // Don't throw - allow WebSocket to still connect
+        }
+    }
+
+    /**
+     * Connect to WebSocket for real-time messages
+     */
+    private connectWebSocket(dialogId: number, token: string) {
+        // Close existing connection if any
+        const existing = this.activeConnections.get(dialogId);
+        if (existing) {
+            existing.close();
+        }
+
+        // Save token for reconnection
+        this.wsTokens.set(dialogId, token);
+
+        // Reset reconnection attempts
+        this.reconnectAttempts.set(dialogId, 0);
+
+        // Pass token as query parameter (required for WebSocket auth in browser)
+        const encodedToken = encodeURIComponent(token);
+        const wsUrl = `${WS_BASE_URL}/chat/${dialogId}/ws?token=${encodedToken}`;
+        console.log(`Connecting to WebSocket: ${wsUrl.replace(encodedToken, '***')}`);
+
+        // Emit connecting status
+        emitter.emit(`chat:status:${dialogId}`, "connecting");
+
+        try {
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log(`WebSocket connected to chat ${dialogId}`);
+                emitter.emit(`chat:status:${dialogId}`, "connected");
+                // Reset reconnection attempts on successful connection
+                this.reconnectAttempts.set(dialogId, 0);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data: WSMessage = JSON.parse(event.data);
+                    this.handleWebSocketMessage(dialogId, data);
+                } catch (error) {
+                    console.error("Failed to parse WebSocket message:", error);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error(`WebSocket error for chat ${dialogId}:`, error);
+                emitter.emit(`chat:status:${dialogId}`, "error");
+            };
+
+            ws.onclose = () => {
+                console.log(`WebSocket closed for chat ${dialogId}`);
+                this.activeConnections.delete(dialogId);
+                emitter.emit(`chat:status:${dialogId}`, "disconnected");
+
+                // Attempt to reconnect
+                this.scheduleReconnect(dialogId, token);
+            };
+
+            this.activeConnections.set(dialogId, ws);
+        } catch (error) {
+            console.error(`Failed to create WebSocket for chat ${dialogId}:`, error);
+            emitter.emit(`chat:status:${dialogId}`, "error");
+            // Schedule reconnect on error
+            this.scheduleReconnect(dialogId, token);
+        }
+    }
+
+    /**
+     * Schedule WebSocket reconnection with exponential backoff
+     */
+    private scheduleReconnect(dialogId: number, token: string) {
+        // Clear any existing timer
+        const existingTimer = this.reconnectTimers.get(dialogId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        const attempts = this.reconnectAttempts.get(dialogId) ?? 0;
+
+        // Check if max attempts reached
+        if (attempts >= this.MAX_RECONNECT_ATTEMPTS) {
+            console.error(`Max reconnection attempts reached for chat ${dialogId}`);
+            emitter.emit(`chat:status:${dialogId}`, "reconnect_failed");
+            return;
+        }
+
+        // Calculate exponential backoff: 1s, 2s, 4s, 8s, etc.
+        const delay = this.BASE_RECONNECT_DELAY * Math.pow(2, attempts);
+
+        console.log(`Scheduling reconnect for chat ${dialogId} in ${delay}ms (attempt ${attempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})`);
+
+        const timer = setTimeout(() => {
+            this.reconnectAttempts.set(dialogId, attempts + 1);
+            emitter.emit(`chat:status:${dialogId}`, "reconnecting");
+            this.connectWebSocket(dialogId, token);
+        }, delay);
+
+        this.reconnectTimers.set(dialogId, timer);
+    }
+
+    /**
+     * Handle incoming WebSocket messages
+     */
+    private handleWebSocketMessage(dialogId: number, data: WSMessage) {
+        console.log(`WebSocket message for chat ${dialogId}:`, data.type);
+
+        switch (data.type) {
+            case "message": {
+                // New message received
+                if (data.message && typeof data.message === "object") {
+                    const msgData = data.message as any;
+                    console.debug(`WebSocket new message for chat ${dialogId}:`, msgData);
+                    // Server uses uppercase field names (ID, not id)
+                    const msg: Message = {
+                        id: msgData.ID || msgData.id || 0,
+                        dialogId: msgData.chat_id || dialogId,
+                        senderId: msgData.sender_id,
+                        text: msgData.message,
+                        createdAt: new Date(msgData.Timestamp || msgData.timestamp).getTime(),
+                    };
+                    if (msg.id > 0) {
+                        this.addMessage(dialogId, msg);
+                    }
+                }
+                break;
+            }
+
+            case "history": {
+                // Message history on initial connection
+                if (data.messages && Array.isArray(data.messages)) {
+                    const messages = data.messages
+                        .map((msg: any) => {
+                            // Filter out invalid messages
+                            if (!msg.ID) return null;
+                            return {
+                                id: msg.ID,
+                                dialogId: msg.chat_id || dialogId,
+                                senderId: msg.sender_id,
+                                text: msg.message,
+                                createdAt: new Date(msg.Timestamp || msg.CreatedAt).getTime(),
+                            };
+                        })
+                        .filter((msg): msg is Message => msg !== null);
+                    messages.sort((a, b) => a.createdAt - b.createdAt);
+                    this.messagesByDialog.set(dialogId, messages);
+                    emitter.emit(`messages:history:${dialogId}`, { dialogId, messages });
+                } else {
+                    // No history messages
+                    this.messagesByDialog.set(dialogId, []);
+                    emitter.emit(`messages:history:${dialogId}`, { dialogId, messages: [] });
+                }
+                break;
+            }
+
+            case "message_sent": {
+                // Confirmation that message was sent
+                console.log(`Message sent confirmation at ${data.timestamp}`);
+                break;
+            }
+
+            case "typing": {
+                // User typing indicator
+                if (data.user_id && data.user_id !== this.currentUserId) {
+                    const typingUsers = this.typingUsers.get(dialogId) || [];
+                    const isTyping = data.message === true || data.message === "true";
+
+                    if (isTyping) {
+                        // Add or update typing user
+                        const existingIndex = typingUsers.findIndex(u => u.userId === data.user_id);
+                        if (existingIndex >= 0) {
+                            typingUsers[existingIndex].isTyping = true;
+                        } else {
+                            typingUsers.push({
+                                userId: data.user_id,
+                                username: data.username || `User ${data.user_id}`,
+                                isTyping: true,
+                            });
+                        }
+                        this.typingUsers.set(dialogId, typingUsers);
+                        emitter.emit(`typing:${dialogId}`, { users: typingUsers });
+                    } else {
+                        // Remove typing user
+                        const filteredUsers = typingUsers.filter(u => u.userId !== data.user_id);
+                        this.typingUsers.set(dialogId, filteredUsers);
+                        emitter.emit(`typing:${dialogId}`, { users: filteredUsers });
+                    }
+                }
+                break;
+            }
+
+            case "error": {
+                console.error(`WebSocket error event:`, data.message);
+                break;
+            }
+
+            case "room_info": {
+                console.log(`Room info for chat ${dialogId}:`, data.message);
+                break;
+            }
+
+            case "user_joined":
+            case "user_left": {
+                console.log(`User ${data.type} chat ${dialogId}:`, data.user_id);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Add message to store and emit event
+     */
+    private addMessage(dialogId: number, msg: Message) {
         const arr = this.messagesByDialog.get(dialogId) ?? [];
-        arr.push(msg);
-        this.messagesByDialog.set(dialogId, arr);
-        emitter.emit<Message>(`msg:${dialogId}`, msg);
-        this.recalcDialogSummaries();
-        return msg;
+        // Check if message already exists
+        const exists = arr.find((m) => m.id === msg.id);
+        if (!exists) {
+            arr.push(msg);
+            arr.sort((a, b) => a.createdAt - b.createdAt);
+            this.messagesByDialog.set(dialogId, arr);
+            // Only emit and recalc if message was actually added
+            emitter.emit<Message>(`msg:${dialogId}`, msg);
+            this.recalcDialogSummaries();
+        }
+    }
+
+    /**
+     * Send message via WebSocket directly (no queue)
+     */
+    sendMessage(dialogId: number, text: string) {
+        const ws = this.activeConnections.get(dialogId);
+
+        // If WebSocket is not ready, throw error
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            console.error(`WebSocket not ready for chat ${dialogId}`);
+            throw new Error(`WebSocket not connected to chat ${dialogId}`);
+        }
+
+        const payload = {
+            type: "message",
+            message: text.trim(),
+            timestamp: Date.now(),
+        };
+
+        try {
+            ws.send(JSON.stringify(payload));
+            console.log(`Message sent to chat ${dialogId}`);
+        } catch (error) {
+            console.error(`Failed to send message to chat ${dialogId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Send typing indicator
+     */
+    sendTypingIndicator(dialogId: number, isTyping: boolean) {
+        const ws = this.activeConnections.get(dialogId);
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        const payload = {
+            type: "typing",
+            message: isTyping.toString(),
+        };
+
+        try {
+            ws.send(JSON.stringify(payload));
+        } catch (error) {
+            console.error(`Failed to send typing indicator:`, error);
+        }
+    }
+
+    /**
+     * Mark message as read
+     */
+    markAsRead(dialogId: number, messageId: number) {
+        const ws = this.activeConnections.get(dialogId);
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        const payload = {
+            type: "read_receipt",
+            message_id: messageId,
+            timestamp: Date.now(),
+        };
+
+        try {
+            ws.send(JSON.stringify(payload));
+        } catch (error) {
+            console.error(`Failed to send read receipt:`, error);
+        }
+    }
+
+    /**
+     * Get typing users in dialog
+     */
+    getTypingUsers(dialogId: number): TypingUser[] {
+        return this.typingUsers.get(dialogId) || [];
+    }
+
+    /**
+     * Subscribe to typing events
+     */
+    subscribeTyping(dialogId: number, cb: Listener<{ users: TypingUser[] }>) {
+        return emitter.on(`typing:${dialogId}`, cb);
+    }
+
+    /**
+     * Edit message
+     */
+    editMessage(dialogId: number, messageId: number, newText: string) {
+        const ws = this.activeConnections.get(dialogId);
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            throw new Error(`WebSocket not connected to chat ${dialogId}`);
+        }
+
+        const payload = {
+            type: "message_edit",
+            message_id: messageId,
+            message: newText.trim(),
+            timestamp: Date.now(),
+        };
+
+        try {
+            ws.send(JSON.stringify(payload));
+            console.log(`Message ${messageId} edited in chat ${dialogId}`);
+
+            // Update local message
+            const messages = this.messagesByDialog.get(dialogId);
+            if (messages) {
+                const msg = messages.find(m => m.id === messageId);
+                if (msg) {
+                    msg.text = newText.trim();
+                    msg.updatedAt = Date.now();
+                    emitter.emit<Message>(`msg:${dialogId}`, msg);
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to edit message:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete message
+     */
+    deleteMessage(dialogId: number, messageId: number) {
+        const ws = this.activeConnections.get(dialogId);
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            throw new Error(`WebSocket not connected to chat ${dialogId}`);
+        }
+
+        const payload = {
+            type: "message_delete",
+            message_id: messageId,
+            timestamp: Date.now(),
+        };
+
+        try {
+            ws.send(JSON.stringify(payload));
+            console.log(`Message ${messageId} deleted in chat ${dialogId}`);
+
+            // Update local message
+            const messages = this.messagesByDialog.get(dialogId);
+            if (messages) {
+                const msg = messages.find(m => m.id === messageId);
+                if (msg) {
+                    msg.isDeleted = true;
+                    msg.text = "[Deleted]";
+                    emitter.emit<Message>(`msg:${dialogId}`, msg);
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to delete message:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get user by ID with caching (5 minute TTL)
+     */
+    async getUser(userId: number): Promise<User> {
+        const cached = this.userCache.get(userId);
+
+        // Return cached data if valid
+        if (cached && Date.now() - cached.timestamp < this.USER_CACHE_TTL) {
+            return cached.data;
+        }
+
+        try {
+            const user = await userAPI.getUser(userId);
+            // Cache the result
+            this.userCache.set(userId, {
+                data: user,
+                timestamp: Date.now(),
+            });
+            return user;
+        } catch (error) {
+            console.error(`Failed to load user ${userId}:`, error);
+            // Return unknown user on error
+            return {
+                id: userId,
+                username: "Неизвестно",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+        }
+    }
+
+    /**
+     * Clear user cache
+     */
+    clearUserCache() {
+        this.userCache.clear();
+    }
+
+    /**
+     * Disconnect from chat WebSocket
+     */
+    disconnectChat(dialogId: number) {
+        const ws = this.activeConnections.get(dialogId);
+        if (ws) {
+            ws.close();
+            this.activeConnections.delete(dialogId);
+        }
+
+        // Clear reconnect timer
+        const timer = this.reconnectTimers.get(dialogId);
+        if (timer) {
+            clearTimeout(timer);
+            this.reconnectTimers.delete(dialogId);
+        }
+
+        console.log(`Disconnected from chat ${dialogId}`);
+    }
+
+    /**
+     * Disconnect from all chats
+     */
+    disconnectAll() {
+        for (const [dialogId, ws] of this.activeConnections) {
+            ws.close();
+        }
+        this.activeConnections.clear();
+
+        // Clear all reconnect timers
+        for (const timer of this.reconnectTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.reconnectTimers.clear();
+
+        console.log("Disconnected from all chats");
     }
 }
 
