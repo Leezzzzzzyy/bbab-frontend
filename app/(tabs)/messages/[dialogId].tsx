@@ -1,6 +1,7 @@
 import colors from "@/assets/colors";
 import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
+import ConnectionStatus, { type ConnectionStatusType } from "@/components/chat/ConnectionStatus";
 import { chatStore, type Message } from "@/services/chat";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useNavigation } from "expo-router";
@@ -17,9 +18,9 @@ import {
 } from "react-native";
 
 export default function ChatScreen() {
-    const { dialogId } = useLocalSearchParams<{ dialogId: string }>();
+    const {dialogId} = useLocalSearchParams<{ dialogId: string }>();
     const nav = useNavigation();
-    const { credentials } = useAuth();
+    const {credentials} = useAuth();
 
     const dialogIdNum = useMemo(() => (dialogId ? parseInt(dialogId) : null), [dialogId]);
     const dialog = useMemo(
@@ -29,7 +30,7 @@ export default function ChatScreen() {
 
     useEffect(() => {
         if (dialog) {
-            nav.setOptions({ title: dialog.name });
+            nav.setOptions({title: dialog.name});
         }
     }, [dialog, nav]);
 
@@ -38,13 +39,15 @@ export default function ChatScreen() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>("connecting");
+    const [senderNames, setSenderNames] = useState<{[key: number]: string}>({}); // Cache sender names
 
     const listRef = useRef<FlatList<Message>>(null);
 
     const loadMore = useCallback(() => {
         if (!dialogIdNum || loadingMore || !hasMore) return;
         setLoadingMore(true);
-        const { messages: batch, hasMore: more, nextCursor } = chatStore.getMessages(dialogIdNum, cursor, 20);
+        const {messages: batch, hasMore: more, nextCursor} = chatStore.getMessages(dialogIdNum, cursor, 20);
         setMessages((prev) => [...batch, ...prev]);
         setHasMore(more);
         setCursor(nextCursor);
@@ -61,9 +64,9 @@ export default function ChatScreen() {
                 await chatStore.connectToChat(dialogIdNum, credentials.token);
 
                 // Load initial messages
-                const { messages: initialMessages } = chatStore.getMessages(dialogIdNum, undefined, 50);
-                setMessages(initialMessages);
-                setHasMore(initialMessages.length >= 50);
+                // const {messages: initialMessages} = chatStore.getMessages(dialogIdNum, undefined, 50);
+                // setMessages(initialMessages);
+                // setHasMore(initialMessages.length >= 50);
                 setCursor(undefined);
             } catch (error) {
                 console.error("Failed to connect to chat:", error);
@@ -84,12 +87,26 @@ export default function ChatScreen() {
                 }
                 return [...prev, m];
             });
-            requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
+            requestAnimationFrame(() => listRef.current?.scrollToOffset({offset: 0, animated: true}));
+        });
+
+        const offHistory = chatStore.subscribeHistory(dialogIdNum, ({messages: history}) => {
+            console.debug(`History loaded for chat ${dialogIdNum}:`, history.length);
+            setMessages(history);
+            setHasMore(history.length >= 50);
+            setCursor(undefined);
+        });
+
+        // Subscribe to connection status
+        const offStatus = chatStore.subscribeStatus(dialogIdNum, (status) => {
+            setConnectionStatus(status as ConnectionStatusType);
         });
 
         // Cleanup on unmount or dialogId change
         return () => {
             offMessages();
+            offHistory();
+            offStatus();
             chatStore.disconnectChat(dialogIdNum);
         };
     }, [dialogIdNum, credentials?.token]);
@@ -98,6 +115,7 @@ export default function ChatScreen() {
         (text: string) => {
             if (!dialogIdNum) return;
             try {
+                // Send message directly to WebSocket
                 chatStore.sendMessage(dialogIdNum, text);
             } catch (error) {
                 console.error("Failed to send message:", error);
@@ -108,70 +126,108 @@ export default function ChatScreen() {
     );
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
             <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.select({ ios: "padding", android: undefined })}
-                keyboardVerticalOffset={Platform.select({ ios: 88, android: 0 })}
+                style={{flex: 1}}
+                behavior={Platform.select({ios: "padding", android: undefined})}
+                keyboardVerticalOffset={Platform.select({ios: 88, android: 0})}
             >
-                {isConnecting && (
-                    <View style={{ paddingVertical: 12, alignItems: "center" }}>
-                        <ActivityIndicator color={colors.main} />
+                {isConnecting ? (
+                    // Loading screen during connection
+                    <View style={{
+                        flex: 1,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: colors.background,
+                    }}>
+                        <ActivityIndicator size="large" color={colors.main}/>
+                        <Text style={{
+                            marginTop: 16,
+                            fontSize: 16,
+                            color: colors.main,
+                            fontWeight: "500",
+                        }}>
+                            Подключение...
+                        </Text>
+                        <Text style={{
+                            marginTop: 8,
+                            fontSize: 14,
+                            color: colors.additionalText,
+                        }}>
+                            Загрузка чата
+                        </Text>
                     </View>
-                )}
-                <FlatList
-                    ref={listRef}
-                    data={[...messages].reverse()}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => (
-                        <MessageBubble
-                            message={item}
-                            isMe={item.senderId === chatStore.currentUserId}
+                ) : (
+                    <>
+                        <ConnectionStatus status={connectionStatus}/>
+                        <FlatList
+                            ref={listRef}
+                            data={[...messages].reverse()}
+                            keyExtractor={(item) => (item.id ? `msg-${item.id}` : `msg-${item.createdAt}`)}
+                            renderItem={({item}) => {
+                                const isMe = item.senderId === chatStore.currentUserId;
+                                const senderName = senderNames[item.senderId];
+
+                                // Load sender name if not Me and not cached
+                                if (!isMe && !senderName) {
+                                    chatStore.getUser(item.senderId).then((user) => {
+                                        setSenderNames((prev) => ({
+                                            ...prev,
+                                            [item.senderId]: user.username || "Неизвестно",
+                                        }));
+                                    });
+                                }
+
+                                return (
+                                    <MessageBubble
+                                        message={item}
+                                        isMe={isMe}
+                                        senderName={senderName}
+                                    />
+                                );
+                            }}
+                            contentContainerStyle={{paddingVertical: 8}}
+                            inverted
+                            onEndReachedThreshold={0.2}
+                            onEndReached={() => {
+                                if (!loadingMore && hasMore) loadMore();
+                            }}
+                            ListFooterComponent={
+                                loadingMore ? (
+                                    <View style={{paddingVertical: 12}}>
+                                        <ActivityIndicator color={colors.main}/>
+                                    </View>
+                                ) : null
+                            }
+                            ListEmptyComponent={
+                                <View style={{
+                                    flex: 1,
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    paddingVertical: 40,
+                                }}>
+                                    <Text style={{
+                                        color: colors.additionalText,
+                                        fontSize: 16,
+                                        textAlign: "center",
+                                    }}>
+                                        Нет сообщений
+                                    </Text>
+                                    <Text style={{
+                                        color: colors.additionalText,
+                                        fontSize: 14,
+                                        textAlign: "center",
+                                        marginTop: 8,
+                                    }}>
+                                        Начните разговор
+                                    </Text>
+                                </View>
+                            }
                         />
-                    )}
-                    contentContainerStyle={{ paddingVertical: 8 }}
-                    inverted
-                    onEndReachedThreshold={0.2}
-                    onEndReached={() => {
-                        if (!loadingMore && hasMore) loadMore();
-                    }}
-                    ListFooterComponent={
-                        loadingMore ? (
-                            <View style={{ paddingVertical: 12 }}>
-                                <ActivityIndicator color={colors.main} />
-                            </View>
-                        ) : null
-                    }
-                    ListEmptyComponent={
-                        !isConnecting ? (
-                            <View style={{
-                                flex: 1,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                paddingVertical: 40,
-                            }}>
-                                <Text style={{
-                                    color: colors.additionalText,
-                                    fontSize: 16,
-                                    textAlign: "center",
-                                }}>
-                                    No messages yet
-                                </Text>
-                                <Text style={{
-                                    color: colors.additionalText,
-                                    fontSize: 14,
-                                    textAlign: "center",
-                                    marginTop: 8,
-                                }}>
-                                    Start the conversation
-                                </Text>
-                            </View>
-                        ) : null
-                    }
-                />
-                <MessageInput onSend={onSend} />
+                        <MessageInput onSend={onSend} disabled={isConnecting}/>
+                    </>
+                )}
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
-

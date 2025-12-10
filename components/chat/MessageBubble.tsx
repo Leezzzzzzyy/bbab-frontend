@@ -7,11 +7,13 @@ import type {Message} from "@/services/chat";
 export default function MessageBubble({
     message,
     isMe,
+    senderName,
     onEdit,
     onDelete,
 }: {
     message: Message;
     isMe: boolean;
+    senderName?: string;
     onEdit?: (text: string) => void;
     onDelete?: () => void;
 }) {
@@ -66,14 +68,29 @@ export default function MessageBubble({
     }
 
     return (
-        <View
-            style={{
-                flexDirection: "row",
-                justifyContent: isMe ? "flex-end" : "flex-start",
-                marginVertical: 4,
-                paddingHorizontal: 12,
-            }}
-        >
+        <View>
+            {/* Sender name for other users' messages */}
+            {!isMe && senderName && (
+                <Text
+                    style={{
+                        marginVertical: 2,
+                        marginHorizontal: 12,
+                        fontSize: 12,
+                        fontWeight: "600",
+                        color: colors.maintext,
+                    }}
+                >
+                    {senderName}
+                </Text>
+            )}
+            <View
+                style={{
+                    flexDirection: "row",
+                    justifyContent: isMe ? "flex-end" : "flex-start",
+                    marginVertical: 4,
+                    paddingHorizontal: 12,
+                }}
+            >
             <Pressable
                 onLongPress={() => isMe && setShowActions(!showActions)}
                 onPress={() => setShowActions(false)}
@@ -215,6 +232,7 @@ export default function MessageBubble({
                     </Pressable>
                 </View>
             )}
+            </View>
         </View>
     );
 }

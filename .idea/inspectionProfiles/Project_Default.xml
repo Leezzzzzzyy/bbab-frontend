@@ -6,6 +6,7 @@
       <option name="customHeaders">
         <set>
           <option value="'Аuthorization" />
+          <option value="Аuthorization" />
         </set>
       </option>
     </inspection_tool>

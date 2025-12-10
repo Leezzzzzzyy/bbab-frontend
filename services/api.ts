@@ -342,12 +342,12 @@ export const chatAPI = {
 
     /**
      * GET /chat/{id}
-     * Retrieve all messages from a chat by its ID. Cached messages are returned from Redis if available
+     * Retrieve all messages from a chat by its ID
      */
-    getChat: async (chatId: number): Promise<Message[]> => {
+    getChat: async (chatId: number, token: string): Promise<Message[]> => {
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}`, {
             method: "GET",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },

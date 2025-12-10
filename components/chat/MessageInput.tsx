@@ -6,26 +6,30 @@ import {View, TextInput, Pressable, Keyboard} from "react-native";
 export default function MessageInput({
     onSend,
     onTextChange,
+    disabled = false,
 }: {
     onSend: (text: string) => void;
     onTextChange?: (text: string) => void;
+    disabled?: boolean;
 }) {
     const [text, setText] = useState("");
 
     const submit = useCallback(() => {
+        if (disabled) return;
         const value = text.trim();
         if (!value) return;
         onSend(value);
         setText("");
         Keyboard.dismiss();
-    }, [onSend, text]);
+    }, [onSend, text, disabled]);
 
     const handleTextChange = useCallback(
         (value: string) => {
+            if (disabled) return;
             setText(value);
             onTextChange?.(value);
         },
-        [onTextChange]
+        [onTextChange, disabled]
     );
 
     return (
@@ -38,15 +42,17 @@ export default function MessageInput({
                 backgroundColor: colors.backgroundAccent,
                 borderTopColor: "rgba(255,255,255,0.08)",
                 borderTopWidth: 1,
+                opacity: disabled ? 0.5 : 1,
             }}
         >
             <TextInput
-                placeholder="Message"
+                placeholder="Сообщение"
                 placeholderTextColor={colors.additionalText}
                 value={text}
                 onChangeText={handleTextChange}
                 onSubmitEditing={submit}
                 multiline
+                editable={!disabled}
                 style={{
                     flex: 1,
                     minHeight: 40,
@@ -56,12 +62,13 @@ export default function MessageInput({
                     paddingVertical: 8,
                     backgroundColor: "#262626",
                     borderRadius: 12,
+                    opacity: disabled ? 0.6 : 1,
                 }}
             />
             <Pressable
                 onPress={submit}
-                disabled={!text.trim()}
-                style={{padding: 10, opacity: text.trim() ? 1 : 0.5}}
+                disabled={!text.trim() || disabled}
+                style={{padding: 10, opacity: (text.trim() && !disabled) ? 1 : 0.5}}
             >
                 <Ionicons name="send" color={colors.main} size={24}/>
             </Pressable>
