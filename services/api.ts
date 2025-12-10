@@ -37,11 +37,11 @@ export interface TokenResponse {
 
 export interface User {
     id: number;
-    username: string;
+    username?: string | null;
     password?: string;
-    phone?: string;
-    createdAt: string;
-    updatedAt: string;
+    phone?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
     deletedAt?: string | null;
     chats?: Chat[];
 }

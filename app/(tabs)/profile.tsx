@@ -1,9 +1,9 @@
 import colors from "@/assets/colors";
-import {useAuth} from "@/context/AuthContext";
-import {userAPI, type User} from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
+import { userAPI, type User } from "@/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {useRouter} from "expo-router";
-import React, {useEffect, useState} from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
@@ -65,7 +65,7 @@ export default function ProfileScreen() {
         }
     };
 
-    const getInitials = (username: string) => {
+    const getInitials = (username: string | undefined | null) => {
         if (!username) return "?";
         const parts = username.trim().split(" ");
         if (parts.length >= 2) {

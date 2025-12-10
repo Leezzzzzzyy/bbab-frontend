@@ -30,7 +30,6 @@ export default function UserSearch({onClose}: UserSearchProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [users, setUsers] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [isCreatingChat, setIsCreatingChat] = useState<number | null>(null);
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Debounced search
@@ -53,9 +52,22 @@ export default function UserSearch({onClose}: UserSearchProps) {
                 }
 
                 const results = await userAPI.searchUsers(searchQuery.trim());
-                // Filter out current user if we can get their ID
-                // For now, just show all results
-                setUsers(results.filter(r => r.id != null));
+
+                const normalized = results.map(user => {
+                    const raw = user as any; // временно отключаем TS для приведения
+                    return {
+                        id: raw.id ?? raw.ID,
+                        username: raw.username ?? raw.Username ?? null,
+                        password: raw.password ?? raw.Password ?? "",
+                        phone: raw.phone ?? raw.Phone ?? null,
+                        createdAt: raw.createdAt ?? raw.CreatedAt ?? null,
+                        updatedAt: raw.updatedAt ?? raw.UpdatedAt ?? null,
+                        deletedAt: raw.deletedAt ?? raw.DeletedAt ?? null,
+                        chats: raw.chats ?? raw.Chats ?? [],
+                    };
+                });
+
+                setUsers(normalized.filter(u => u.id != null));
             } catch (error) {
                 console.error("[UserSearch] Failed to search users:", error);
                 setUsers([]);
@@ -72,42 +84,35 @@ export default function UserSearch({onClose}: UserSearchProps) {
     }, [searchQuery, credentials?.token]);
 
     const handleUserSelect = useCallback(
-        async (user: User) => {
-            if (!credentials?.token || isCreatingChat === user.id) return;
+  async (user: User) => {
+    if (!credentials?.token) return;
 
-            setIsCreatingChat(user.id);
-            try {
-                // Create chat with selected user
-                const chat = await chatAPI.createChat(
-                    {
-                        name: "", // Empty name for direct chat
-                        user_ids: [user.id],
-                    },
-                    credentials.token
-                );
-
-                // Navigate to chat
-                router.push(`/messages/${chat.id}`);
-                onClose?.();
-            } catch (error) {
-                console.error("[UserSearch] Failed to create chat:", error);
-                // TODO: Show error toast
-            } finally {
-                setIsCreatingChat(null);
-            }
+    try {
+      // Можно дать читаемое имя:
+      const chatName = user.username || user.phone || "Чат";
+      // user_ids - массив id пользователей в чате, обычно [вы, выбранный пользователь]
+      const resultChat = await chatAPI.createChat(
+        {
+          name: chatName,
+          user_ids: [user.id, /* ваш id, если он нужен на бэке */],
         },
-        [credentials?.token, isCreatingChat, router, onClose]
-    );
+        credentials.token
+      );
+      // Навигация к чату
+      router.push(`/messages/${resultChat.id}`);
+    } catch (err) {
+      console.error("[CreateChat] Ошибка создания чата:", err);
+    }
+  },
+  [router, credentials]
+);
 
     const renderUserItem = useCallback(
         ({item}: {item: User}) => {
-            const isCreating = isCreatingChat === item.id;
-
             return (
                 <TouchableOpacity
                     style={styles.userItem}
                     onPress={() => handleUserSelect(item)}
-                    disabled={isCreating}
                 >
                     <View style={styles.userInfo}>
                         <View style={styles.avatar}>
@@ -122,15 +127,11 @@ export default function UserSearch({onClose}: UserSearchProps) {
                             )}
                         </View>
                     </View>
-                    {isCreating ? (
-                        <ActivityIndicator size="small" color={colors.main}/>
-                    ) : (
-                        <Ionicons name="chatbubble-outline" size={20} color={colors.main}/>
-                    )}
+                    <Ionicons name="chatbubble-outline" size={20} color={colors.main}/>
                 </TouchableOpacity>
             );
         },
-        [handleUserSelect, isCreatingChat]
+        [handleUserSelect]
     );
 
     return (
