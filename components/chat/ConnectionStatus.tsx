@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import colors from "@/assets/colors";
 
 export type ConnectionStatusType = "connecting" | "connected" | "disconnected" | "error";
 
@@ -21,7 +20,7 @@ export default function ConnectionStatus({
             color: "#FFA500",
         },
         disconnected: {
-            icon: "wifi-off" as const,
+            icon: "alert-circle-outline" as const,
             text: "Отключено",
             color: "#999",
         },

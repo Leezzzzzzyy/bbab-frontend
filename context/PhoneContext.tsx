@@ -17,6 +17,7 @@ export const PhoneProvider: React.FC<PhoneProviderProps> = ({children}) => {
     const [phoneNumber, setPhoneNumber] = useState("");
     const [confirmationCode, setConfirmationCode] = useState("");
 
+    // @ts-ignore
     return (
         <PhoneContext.Provider value={{phoneNumber, setPhoneNumber, confirmationCode, setConfirmationCode}}>
             {children}

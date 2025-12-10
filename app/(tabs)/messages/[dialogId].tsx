@@ -2,7 +2,7 @@ import colors from "@/assets/colors";
 import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
 import ConnectionStatus, { type ConnectionStatusType } from "@/components/chat/ConnectionStatus";
-import {chatStore, currentUserId, type Message} from "@/services/chat";
+import {chatStore, type Message} from "@/services/chat";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,9 +15,7 @@ import {
     Text,
     View,
     Alert,
-    Text,
 } from "react-native";
-import {userAPI} from "@/services";
 
 export default function ChatScreen() {
     const {dialogId} = useLocalSearchParams<{ dialogId: string }>();
@@ -44,21 +42,12 @@ export default function ChatScreen() {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>("connecting");
     const [senderNames, setSenderNames] = useState<{[key: number]: string}>({}); // Cache sender names
 
-    // Fetch current user ID
+    // Set current user ID in chatStore from credentials
     useEffect(() => {
-        if (credentials?.token && !currentUserId) {
-            userAPI
-                .getCurrentUser(credentials.token)
-                .then((user) => {
-                    setCurrentUserId(user.id);
-                    // Set navigation title
-                    nav.setOptions({title: user.username || "Chat"});
-                })
-                .catch((error) => {
-                    console.error("[ChatScreen] Failed to get current user:", error);
-                });
+        if (credentials?.userId) {
+            chatStore.setCurrentUserId(credentials.userId);
         }
-    }, [credentials?.token, currentUserId, nav]);
+    }, [credentials?.userId]);
 
     const listRef = useRef<FlatList<Message>>(null);
 
@@ -145,11 +134,11 @@ export default function ChatScreen() {
 
     const handleTyping = useCallback(
         (isTyping: boolean) => {
-            if (chatId) {
-                sendTypingIndicator(isTyping);
+            if (dialogIdNum) {
+                chatStore.sendTypingIndicator(dialogIdNum, isTyping);
             }
         },
-        [chatId, sendTypingIndicator]
+        [dialogIdNum]
     );
 
 
@@ -252,7 +241,7 @@ export default function ChatScreen() {
                                 </View>
                             }
                         />
-                        <MessageInput onSend={onSend} disabled={isConnecting}/>
+                        <MessageInput onSend={onSend} onTyping={handleTyping} disabled={isConnecting}/>
                     </>
                 )}
             </KeyboardAvoidingView>

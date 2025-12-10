@@ -3,10 +3,9 @@ import {chatStore, type Dialog} from "@/services/chat";
 import {useAuth} from "@/context/AuthContext";
 import {Link} from "expo-router";
 import React, {useEffect, useState} from "react";
-import {FlatList, Text, View, Pressable, ActivityIndicator, Alert} from "react-native";
+import {FlatList, Text, View, Pressable, ActivityIndicator, Alert, Modal, SafeAreaView} from "react-native";
 import UserSearch from "@/components/chat/UserSearch";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {  Modal, SafeAreaView, } from "react-native";
 
 
 export default function MessagesIndex() {
@@ -112,18 +111,6 @@ export default function MessagesIndex() {
                             </Pressable>
                         </Link>
                     )}
-                    ListHeaderComponent={() => (
-                        <Text
-                            style={{
-                                color: colors.maintext,
-                                fontSize: 22,
-                                fontWeight: "800",
-                                marginBottom: 12,
-                            }}
-                        >
-                            Messages
-                        </Text>
-                    )}
                     ListEmptyComponent={() => (
                         <View style={{
                             flex: 1,
@@ -150,45 +137,45 @@ export default function MessagesIndex() {
                     )}
                 />
             )}
-                <Modal
-                    visible={isSearchModalVisible}
-                    animationType="slide"
-                    presentationStyle="pageSheet"
-                    onRequestClose={() => setIsSearchModalVisible(false)}
-                >
-                    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
-                        <View
+            </View>
+            <Modal
+                visible={isSearchModalVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setIsSearchModalVisible(false)}
+            >
+                <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
+                    <View
+                        style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: 16,
+                            borderBottomWidth: 1,
+                            borderBottomColor: "rgba(255,255,255,0.1)",
+                        }}
+                    >
+                        <Text
                             style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: 16,
-                                borderBottomWidth: 1,
-                                borderBottomColor: "rgba(255,255,255,0.1)",
+                                color: colors.maintext,
+                                fontSize: 20,
+                                fontWeight: "700",
                             }}
                         >
-                            <Text
-                                style={{
-                                    color: colors.maintext,
-                                    fontSize: 20,
-                                    fontWeight: "700",
-                                }}
-                            >
-                                Новый чат
-                            </Text>
-                            <Pressable
-                                onPress={() => setIsSearchModalVisible(false)}
-                                style={{
-                                    padding: 8,
-                                }}
-                            >
-                                <Ionicons name="close" size={24} color={colors.maintext}/>
-                            </Pressable>
-                        </View>
-                        <UserSearch onClose={() => setIsSearchModalVisible(false)}/>
-                    </SafeAreaView>
-                </Modal>
-
+                            Новый чат
+                        </Text>
+                        <Pressable
+                            onPress={() => setIsSearchModalVisible(false)}
+                            style={{
+                                padding: 8,
+                            }}
+                        >
+                            <Ionicons name="close" size={24} color={colors.maintext}/>
+                        </Pressable>
+                    </View>
+                    <UserSearch onClose={() => setIsSearchModalVisible(false)}/>
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
 
     );

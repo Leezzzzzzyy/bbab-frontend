@@ -92,7 +92,7 @@ class ChatStore {
     private readonly USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
     // Reconnection logic
-    private reconnectTimers = new Map<number, NodeJS.Timeout>();
+    private reconnectTimers = new Map<number, ReturnType<typeof setTimeout>>();
     private reconnectAttempts = new Map<number, number>();
     private readonly MAX_RECONNECT_ATTEMPTS = 10;
     private readonly BASE_RECONNECT_DELAY = 1000; // 1 second
@@ -228,16 +228,15 @@ class ChatStore {
 
             const messages = response
                 .map((msg) => {
-                    const timestamp =
-                        msg.Timestamp ?? msg.CreatedAt ?? msg.createdAt;
+                    const timestamp = msg.createdAt;
                     return {
-                        id: msg.ID ?? msg.id ?? 0,
-                        dialogId: msg.chat_id ?? msg.chatID ?? dialogId,
-                        senderId: msg.sender_id ?? msg.senderID ?? 0,
-                        text: msg.message ?? msg.Message ?? "",
+                        id: msg.id,
+                        dialogId: msg.chatID,
+                        senderId: msg.senderID,
+                        text: msg.message,
                         createdAt: timestamp ? new Date(timestamp).getTime() : Date.now(),
-                        updatedAt: msg.UpdatedAt ? new Date(msg.UpdatedAt).getTime() : undefined,
-                        isDeleted: Boolean(msg.DeletedAt),
+                        updatedAt: msg.updatedAt ? new Date(msg.updatedAt).getTime() : undefined,
+                        isDeleted: Boolean(msg.deletedAt),
                     } as Message;
                 })
                 .filter((msg): msg is Message => msg.id > 0);
