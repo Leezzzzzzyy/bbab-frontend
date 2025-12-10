@@ -10,6 +10,7 @@ import React, {
 export interface AuthCredentials {
   token: string;
   username: string;
+  userId?: number;
   phone?: string;
 }
 

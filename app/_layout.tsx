@@ -1,5 +1,6 @@
 import colors from "@/assets/colors";
 import { AuthProvider, useAuth } from "@/context";
+import { chatStore } from "@/services/chat";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Animated } from "react-native";
@@ -8,10 +9,15 @@ function RootLayoutContent() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const router = useRouter();
   const fadeAnim = useState(new Animated.Value(1))[0];
-  const { isSignedIn, isLoading: authLoading } = useAuth();
+  const { isSignedIn, isLoading: authLoading, credentials } = useAuth();
 
   useEffect(() => {
     if (authLoading) return;
+
+    // Initialize ChatStore with current user ID
+    if (isSignedIn && credentials?.userId) {
+      chatStore.setCurrentUserId(credentials.userId);
+    }
 
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
@@ -27,7 +33,7 @@ function RootLayoutContent() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [router, fadeAnim, isSignedIn, authLoading]);
+  }, [router, fadeAnim, isSignedIn, authLoading, credentials?.userId]);
 
   return (
     <>

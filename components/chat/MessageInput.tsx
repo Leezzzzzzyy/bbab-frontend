@@ -3,7 +3,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import React, {useCallback, useState} from "react";
 import {View, TextInput, Pressable, Keyboard} from "react-native";
 
-export default function MessageInput({onSend}: { onSend: (text: string) => void }) {
+export default function MessageInput({
+    onSend,
+    onTextChange,
+}: {
+    onSend: (text: string) => void;
+    onTextChange?: (text: string) => void;
+}) {
     const [text, setText] = useState("");
 
     const submit = useCallback(() => {
@@ -13,6 +19,14 @@ export default function MessageInput({onSend}: { onSend: (text: string) => void 
         setText("");
         Keyboard.dismiss();
     }, [onSend, text]);
+
+    const handleTextChange = useCallback(
+        (value: string) => {
+            setText(value);
+            onTextChange?.(value);
+        },
+        [onTextChange]
+    );
 
     return (
         <View
@@ -30,7 +44,7 @@ export default function MessageInput({onSend}: { onSend: (text: string) => void 
                 placeholder="Message"
                 placeholderTextColor={colors.additionalText}
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleTextChange}
                 onSubmitEditing={submit}
                 multiline
                 style={{

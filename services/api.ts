@@ -323,6 +323,7 @@ export const chatAPI = {
      */
     getChatMessages: async (
         chatId: number,
+        token: string,
         cursor?: string,
         limit: number = 20,
         direction: "older" | "newer" = "older"
@@ -334,7 +335,7 @@ export const chatAPI = {
 
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}/messages?${params.toString()}`, {
             method: "GET",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },
