@@ -1,5 +1,5 @@
 import { AppState } from "react-native";
-import { chatAPI, userAPI, type Message as APIMessage, type ListChatsResponse, type User } from "./api";
+import { chatAPI, userAPI, type User } from "./api";
 import { WS_BASE_URL } from "@/config/environment";
 
 export type Message = {
@@ -211,48 +211,6 @@ class ChatStore {
         }
     }
 
-    /**
-     * Load chat message history via REST API
-     */
-    private async loadChatMessages(dialogId: number, token: string) {
-        try {
-            const response = await chatAPI.getChat(dialogId, token);
-
-            console.log(`[ChatStore] GET /chat/${dialogId} returned ${Array.isArray(response) ? response.length : 0} records`);
-
-            if (!Array.isArray(response)) {
-                this.messagesByDialog.set(dialogId, []);
-                emitter.emit("messages:loaded", { dialogId, messages: [] });
-                return;
-            }
-
-            const messages = response
-                .map((msg) => {
-                    const timestamp = msg.createdAt;
-                    return {
-                        id: msg.id,
-                        dialogId: msg.chatID,
-                        senderId: msg.senderID,
-                        text: msg.message,
-                        createdAt: timestamp ? new Date(timestamp).getTime() : Date.now(),
-                        updatedAt: msg.updatedAt ? new Date(msg.updatedAt).getTime() : undefined,
-                        isDeleted: Boolean(msg.deletedAt),
-                    } as Message;
-                })
-                .filter((msg): msg is Message => msg.id > 0);
-
-            // Sort messages by creation time (ascending)
-            messages.sort((a, b) => a.createdAt - b.createdAt);
-
-            this.messagesByDialog.set(dialogId, messages);
-            emitter.emit("messages:loaded", { dialogId, messages });
-        } catch (error) {
-            console.error(`Failed to load messages for chat ${dialogId}:`, error);
-            // Set empty messages array on error
-            this.messagesByDialog.set(dialogId, []);
-            // Don't throw - allow WebSocket to still connect
-        }
-    }
 
     /**
      * Connect to WebSocket for real-time messages
@@ -562,76 +520,6 @@ class ChatStore {
         return emitter.on(`typing:${dialogId}`, cb);
     }
 
-    /**
-     * Edit message
-     */
-    editMessage(dialogId: number, messageId: number, newText: string) {
-        const ws = this.activeConnections.get(dialogId);
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            throw new Error(`WebSocket not connected to chat ${dialogId}`);
-        }
-
-        const payload = {
-            type: "message_edit",
-            message_id: messageId,
-            message: newText.trim(),
-            timestamp: Date.now(),
-        };
-
-        try {
-            ws.send(JSON.stringify(payload));
-            console.log(`Message ${messageId} edited in chat ${dialogId}`);
-
-            // Update local message
-            const messages = this.messagesByDialog.get(dialogId);
-            if (messages) {
-                const msg = messages.find(m => m.id === messageId);
-                if (msg) {
-                    msg.text = newText.trim();
-                    msg.updatedAt = Date.now();
-                    emitter.emit<Message>(`msg:${dialogId}`, msg);
-                }
-            }
-        } catch (error) {
-            console.error(`Failed to edit message:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Delete message
-     */
-    deleteMessage(dialogId: number, messageId: number) {
-        const ws = this.activeConnections.get(dialogId);
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            throw new Error(`WebSocket not connected to chat ${dialogId}`);
-        }
-
-        const payload = {
-            type: "message_delete",
-            message_id: messageId,
-            timestamp: Date.now(),
-        };
-
-        try {
-            ws.send(JSON.stringify(payload));
-            console.log(`Message ${messageId} deleted in chat ${dialogId}`);
-
-            // Update local message
-            const messages = this.messagesByDialog.get(dialogId);
-            if (messages) {
-                const msg = messages.find(m => m.id === messageId);
-                if (msg) {
-                    msg.isDeleted = true;
-                    msg.text = "[Deleted]";
-                    emitter.emit<Message>(`msg:${dialogId}`, msg);
-                }
-            }
-        } catch (error) {
-            console.error(`Failed to delete message:`, error);
-            throw error;
-        }
-    }
 
     /**
      * Get user by ID with caching (5 minute TTL)
