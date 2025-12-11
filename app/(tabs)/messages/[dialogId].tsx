@@ -180,7 +180,7 @@ export default function ChatScreen() {
                         <FlatList
                             ref={listRef}
                             data={[...messages].reverse()}
-                            keyExtractor={(item) => (item.id ? `msg-${item.id}` : `msg-${item.createdAt}`)}
+                            keyExtractor={(item) => (item.id ? `msg-${item.id}` : `msg-${item.timestamp}`)}
                             renderItem={({item}) => {
                                 const isMe = item.senderId === chatStore.currentUserId;
                                 const senderName = senderNames[item.senderId];
