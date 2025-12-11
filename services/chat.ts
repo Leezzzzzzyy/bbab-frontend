@@ -532,6 +532,7 @@ class ChatStore {
             return cached.data;
         }
 
+        console.log('getting user from API', userId);
         try {
             const user = await userAPI.getUser(userId);
             // Cache the result
