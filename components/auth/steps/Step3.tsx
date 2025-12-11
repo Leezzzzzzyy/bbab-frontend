@@ -57,7 +57,7 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Save credentials to storage
       await setCredentials({
         token: response.token,
-        username: currentUser.username || username,
+        username: username,
         userId: currentUser.id,
         phone: `+7${phoneNumber}`,
       });

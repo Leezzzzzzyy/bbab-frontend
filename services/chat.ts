@@ -100,6 +100,9 @@ class ChatStore {
     // WebSocket tokens for reconnection
     private wsTokens = new Map<number, string>();
 
+    // Connection state tracking to prevent duplicate connections
+    private connectionStates = new Map<number, "connecting" | "connected" | "disconnected">();
+
     constructor() {
         // Load dialogs on demand via API
         this.recalcDialogSummaries();
@@ -216,10 +219,21 @@ class ChatStore {
      * Connect to WebSocket for real-time messages
      */
     private connectWebSocket(dialogId: number, token: string) {
+        // Prevent multiple concurrent connection attempts
+        const currentState = this.connectionStates.get(dialogId);
+        if (currentState === "connecting") {
+            console.log(`Already connecting to chat ${dialogId}, skipping duplicate request`);
+            return;
+        }
+
         // Close existing connection if any
         const existing = this.activeConnections.get(dialogId);
-        if (existing) {
-            existing.close();
+        if (existing && existing.readyState !== WebSocket.CLOSED) {
+            try {
+                existing.close();
+            } catch (e) {
+                console.log(`Failed to close existing connection for chat ${dialogId}:`, e);
+            }
         }
 
         // Save token for reconnection
@@ -227,6 +241,9 @@ class ChatStore {
 
         // Reset reconnection attempts
         this.reconnectAttempts.set(dialogId, 0);
+
+        // Mark as connecting
+        this.connectionStates.set(dialogId, "connecting");
 
         // Pass token as query parameter (required for WebSocket auth in browser)
         const encodedToken = encodeURIComponent(token);
@@ -240,16 +257,26 @@ class ChatStore {
             const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log(`WebSocket connected to chat ${dialogId}`);
-                emitter.emit(`chat:status:${dialogId}`, "connected");
-                // Reset reconnection attempts on successful connection
-                this.reconnectAttempts.set(dialogId, 0);
+                // Only proceed if we're still in connecting state
+                if (this.connectionStates.get(dialogId) === "connecting") {
+                    console.log(`WebSocket connected to chat ${dialogId}`);
+                    this.connectionStates.set(dialogId, "connected");
+                    emitter.emit(`chat:status:${dialogId}`, "connected");
+                    // Reset reconnection attempts on successful connection
+                    this.reconnectAttempts.set(dialogId, 0);
+                }
             };
 
             ws.onmessage = (event) => {
                 try {
-                    const data: WSMessage = JSON.parse(event.data);
-                    this.handleWebSocketMessage(dialogId, data);
+                    // Handle case where multiple JSON messages are bundled together
+                    this.parseWebSocketMessages(event.data, (data: WSMessage) => {
+                        // Skip heartbeat response messages
+                        if (data.type === "pong" || data.type === "ping") {
+                            return;
+                        }
+                        this.handleWebSocketMessage(dialogId, data);
+                    });
                 } catch (error) {
                     console.error("Failed to parse WebSocket message:", error);
                 }
@@ -257,21 +284,28 @@ class ChatStore {
 
             ws.onerror = (error) => {
                 console.error(`WebSocket error for chat ${dialogId}:`, error);
+                this.connectionStates.set(dialogId, "disconnected");
                 emitter.emit(`chat:status:${dialogId}`, "error");
             };
 
             ws.onclose = () => {
-                console.log(`WebSocket closed for chat ${dialogId}`);
-                this.activeConnections.delete(dialogId);
-                emitter.emit(`chat:status:${dialogId}`, "disconnected");
+                // Only attempt reconnection if we were actually connected
+                const state = this.connectionStates.get(dialogId);
+                if (state !== "disconnected") {
+                    console.log(`WebSocket closed for chat ${dialogId}`);
+                    this.activeConnections.delete(dialogId);
+                    this.connectionStates.set(dialogId, "disconnected");
+                    emitter.emit(`chat:status:${dialogId}`, "disconnected");
 
-                // Attempt to reconnect
-                this.scheduleReconnect(dialogId, token);
+                    // Attempt to reconnect
+                    this.scheduleReconnect(dialogId, token);
+                }
             };
 
             this.activeConnections.set(dialogId, ws);
         } catch (error) {
             console.error(`Failed to create WebSocket for chat ${dialogId}:`, error);
+            this.connectionStates.set(dialogId, "disconnected");
             emitter.emit(`chat:status:${dialogId}`, "error");
             // Schedule reconnect on error
             this.scheduleReconnect(dialogId, token);
@@ -282,10 +316,18 @@ class ChatStore {
      * Schedule WebSocket reconnection with exponential backoff
      */
     private scheduleReconnect(dialogId: number, token: string) {
-        // Clear any existing timer
+        // If already trying to reconnect, don't schedule another one
         const existingTimer = this.reconnectTimers.get(dialogId);
         if (existingTimer) {
-            clearTimeout(existingTimer);
+            console.log(`Reconnection already scheduled for chat ${dialogId}`);
+            return;
+        }
+
+        // Prevent reconnecting if still in connecting state
+        const currentState = this.connectionStates.get(dialogId);
+        if (currentState === "connecting") {
+            console.log(`Still connecting to chat ${dialogId}, not scheduling reconnect`);
+            return;
         }
 
         const attempts = this.reconnectAttempts.get(dialogId) ?? 0;
@@ -297,8 +339,9 @@ class ChatStore {
             return;
         }
 
-        // Calculate exponential backoff: 1s, 2s, 4s, 8s, etc.
-        const delay = this.BASE_RECONNECT_DELAY * Math.pow(2, attempts);
+        // Calculate exponential backoff: 1s, 2s, 4s, 8s, etc., capped at 30 seconds
+        const baseDelay = this.BASE_RECONNECT_DELAY * Math.pow(2, attempts);
+        const delay = Math.min(baseDelay, 30000); // Cap at 30 seconds
 
         console.log(`Scheduling reconnect for chat ${dialogId} in ${delay}ms (attempt ${attempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})`);
 
@@ -309,6 +352,80 @@ class ChatStore {
         }, delay);
 
         this.reconnectTimers.set(dialogId, timer);
+    }
+
+    /**
+     * Parse WebSocket message data that may contain multiple JSON objects
+     * Handles cases where multiple JSON messages are bundled together
+     */
+    private parseWebSocketMessages(data: string, callback: (msg: WSMessage) => void) {
+        let pos = 0;
+
+        while (pos < data.length) {
+            // Find the next opening brace
+            const startPos = data.indexOf('{', pos);
+            if (startPos === -1) break; // No more JSON objects
+
+            // Try to find the matching closing brace
+            let braceCount = 0;
+            let inString = false;
+            let escapeNext = false;
+            let endPos = -1;
+
+            for (let i = startPos; i < data.length; i++) {
+                const char = data[i];
+
+                if (escapeNext) {
+                    escapeNext = false;
+                    continue;
+                }
+
+                if (char === '\\') {
+                    escapeNext = true;
+                    continue;
+                }
+
+                if (char === '"' && !escapeNext) {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (!inString) {
+                    if (char === '{') {
+                        braceCount++;
+                    } else if (char === '}') {
+                        braceCount--;
+                        if (braceCount === 0) {
+                            endPos = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (endPos === -1) {
+                // Malformed JSON, try to parse what we have
+                console.warn('Malformed JSON in WebSocket message, attempting to parse remaining data');
+                try {
+                    const msg = JSON.parse(data.substring(startPos));
+                    callback(msg);
+                } catch (e) {
+                    console.error('Failed to parse remaining WebSocket data:', e);
+                }
+                break;
+            }
+
+            // Extract and parse the JSON object
+            const jsonStr = data.substring(startPos, endPos + 1);
+            try {
+                const msg: WSMessage = JSON.parse(jsonStr);
+                callback(msg);
+            } catch (e) {
+                console.error('Failed to parse WebSocket message:', jsonStr, e);
+            }
+
+            pos = endPos + 1;
+        }
     }
 
     /**
@@ -577,6 +694,9 @@ class ChatStore {
             this.reconnectTimers.delete(dialogId);
         }
 
+        // Clear connection state
+        this.connectionStates.delete(dialogId);
+
         console.log(`Disconnected from chat ${dialogId}`);
     }
 
@@ -594,6 +714,9 @@ class ChatStore {
             clearTimeout(timer);
         }
         this.reconnectTimers.clear();
+
+        // Clear all connection states
+        this.connectionStates.clear();
 
         console.log("Disconnected from all chats");
     }
