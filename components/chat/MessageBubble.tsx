@@ -25,7 +25,7 @@ export default function MessageBubble({
     const [editText, setEditText] = useState(message.text);
 
     const timeDisplay = useMemo(() => {
-        const time = new Date(message.createdAt);
+        const time = new Date(message.timestamp);
         const hh = time.getHours().toString().padStart(2, "0");
         const mm = time.getMinutes().toString().padStart(2, "0");
         
@@ -49,7 +49,7 @@ export default function MessageBubble({
             }
         }
         return display;
-    }, [message.createdAt]);
+    }, [message.timestamp]);
 
     const handleEdit = () => {
         if (editText.trim() && editText !== message.text) {

@@ -7,7 +7,7 @@ export type Message = {
     dialogId: number;
     senderId: number;
     text: string;
-    createdAt: number; // epoch ms
+    timestamp: number; // epoch ms
     updatedAt?: number; // для edited сообщений
     isDeleted?: boolean; // помечено ли как удаленное
     readBy?: number[]; // ID пользователей которые прочитали
@@ -119,7 +119,7 @@ class ChatStore {
             const arr = this.messagesByDialog.get(d.id) || [];
             const last = arr[arr.length - 1];
             d.lastMessage = last?.text ?? undefined;
-            d.lastTime = last?.createdAt ?? undefined;
+            d.lastTime = last?.timestamp ?? undefined;
         }
         emitter.emit("dialogs:updated", this.dialogs.slice());
     }
@@ -176,13 +176,13 @@ class ChatStore {
         const all = this.messagesByDialog.get(dialogId) ?? [];
         let endIndex = all.length;
         if (before != null) {
-            endIndex = all.findIndex((m) => m.createdAt >= before);
+            endIndex = all.findIndex((m) => m.timestamp >= before);
             if (endIndex === -1) endIndex = all.length;
         }
         const startIndex = Math.max(0, endIndex - limit);
         const slice = all.slice(startIndex, endIndex);
         const hasMore = startIndex > 0;
-        const nextCursor = hasMore ? all[startIndex - 1].createdAt : undefined;
+        const nextCursor = hasMore ? all[startIndex - 1].timestamp : undefined;
         return { messages: slice, hasMore, nextCursor };
     }
 
@@ -329,7 +329,7 @@ class ChatStore {
                         dialogId: msgData.chat_id || dialogId,
                         senderId: msgData.sender_id,
                         text: msgData.message,
-                        createdAt: new Date(msgData.Timestamp || msgData.timestamp).getTime(),
+                        timestamp: new Date(msgData.Timestamp || msgData.timestamp).getTime(),
                     };
                     if (msg.id > 0) {
                         this.addMessage(dialogId, msg);
@@ -350,11 +350,11 @@ class ChatStore {
                                 dialogId: msg.chat_id || dialogId,
                                 senderId: msg.sender_id,
                                 text: msg.message,
-                                createdAt: new Date(msg.Timestamp || msg.CreatedAt).getTime(),
+                                timestamp: new Date(msg.Timestamp || msg.CreatedAt).getTime(),
                             };
                         })
                         .filter((msg): msg is Message => msg !== null);
-                    messages.sort((a, b) => a.createdAt - b.createdAt);
+                    messages.sort((a, b) => a.timestamp - b.timestamp);
                     this.messagesByDialog.set(dialogId, messages);
                     emitter.emit(`messages:history:${dialogId}`, { dialogId, messages });
                 } else {
@@ -428,7 +428,7 @@ class ChatStore {
         const exists = arr.find((m) => m.id === msg.id);
         if (!exists) {
             arr.push(msg);
-            arr.sort((a, b) => a.createdAt - b.createdAt);
+            arr.sort((a, b) => a.timestamp - b.timestamp);
             this.messagesByDialog.set(dialogId, arr);
             // Only emit and recalc if message was actually added
             emitter.emit<Message>(`msg:${dialogId}`, msg);
