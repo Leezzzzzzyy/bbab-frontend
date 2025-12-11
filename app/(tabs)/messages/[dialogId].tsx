@@ -111,16 +111,17 @@ export default function ChatScreen() {
         const offMessages = chatStore.subscribeMessages(dialogIdNum, (m) => {
             setMessages((prev) => {
                 // Check if message already exists
-                if (prev.find((msg) => msg.id === m.id)) {
-                    return prev;
-                }
+                // if (prev.find((msg) => msg.id === m.id)) {
+                //     console.log( "duplicate id", m.id, prev)
+                //     return prev;
+                // }
                 return [...prev, m];
             });
             requestAnimationFrame(() => listRef.current?.scrollToOffset({offset: 0, animated: true}));
         });
 
         const offHistory = chatStore.subscribeHistory(dialogIdNum, ({messages: history}) => {
-            console.debug(`History loaded for chat ${dialogIdNum}:`, history.length);
+            console.debug(`History loaded for chat ${dialogIdNum}:`, history.length, history);
             setMessages(history);
             setHasMore(history.length >= 50);
             setCursor(undefined);
