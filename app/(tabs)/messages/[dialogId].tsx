@@ -2,6 +2,7 @@ import colors from "@/assets/colors";
 import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
 import ConnectionStatus, { type ConnectionStatusType } from "@/components/chat/ConnectionStatus";
+import ChatMembersModal from "@/components/chat/ChatMembersModal";
 import {chatStore, type Message} from "@/services/chat";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useNavigation } from "expo-router";
@@ -15,6 +16,7 @@ import {
     Text,
     View,
     Alert,
+    TouchableOpacity,
 } from "react-native";
 
 export default function ChatScreen() {
@@ -30,7 +32,25 @@ export default function ChatScreen() {
 
     useEffect(() => {
         if (dialog) {
-            nav.setOptions({title: dialog.name});
+            nav.setOptions({
+                headerTitle: () => (
+                    <TouchableOpacity
+                        onPress={() => setShowMembersModal(true)}
+                        style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                        }}
+                    >
+                        <Text style={{
+                            fontSize: 18,
+                            fontWeight: '600',
+                            color: colors.text,
+                        }}>
+                            {dialog.name}
+                        </Text>
+                    </TouchableOpacity>
+                ),
+            });
         }
     }, [dialog, nav]);
 
@@ -41,6 +61,7 @@ export default function ChatScreen() {
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>("connecting");
     const [senderNames, setSenderNames] = useState<{[key: number]: string}>({}); // Cache sender names
+    const [showMembersModal, setShowMembersModal] = useState(false);
 
     // Set current user ID in chatStore from credentials
     useEffect(() => {
@@ -245,6 +266,15 @@ export default function ChatScreen() {
                     </>
                 )}
             </KeyboardAvoidingView>
+
+            {dialogIdNum && dialog && (
+                <ChatMembersModal
+                    visible={showMembersModal}
+                    dialogId={dialogIdNum}
+                    dialogName={dialog.name}
+                    onClose={() => setShowMembersModal(false)}
+                />
+            )}
         </SafeAreaView>
     );
 }
