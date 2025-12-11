@@ -1,8 +1,11 @@
 import colors from "@/assets/colors";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {View, Text, Pressable, Alert} from "react-native";
 import type {Message} from "@/services/chat";
+
+const MONTH_NAMES = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
 export default function MessageBubble({
     message,
@@ -21,30 +24,32 @@ export default function MessageBubble({
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.text);
 
-    const time = new Date(message.createdAt);
-    const hh = time.getHours().toString().padStart(2, "0");
-    const mm = time.getMinutes().toString().padStart(2, "0");
-    
-    // Check if message is older than 24 hours
-    const now = new Date();
-    const diffMs = now.getTime() - time.getTime();
-    const isOlderThan24Hours = diffMs > 24 * 60 * 60 * 1000;
-    
-    // Format timestamp
-    let timeDisplay = `${hh}:${mm}`;
-    if (isOlderThan24Hours) {
-        const dd = time.getDate().toString().padStart(2, "0");
-        const monthNames = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-        const month = monthNames[time.getMonth()];
-        const year = time.getFullYear();
-        const currentYear = now.getFullYear();
+    const timeDisplay = useMemo(() => {
+        const time = new Date(message.createdAt);
+        const hh = time.getHours().toString().padStart(2, "0");
+        const mm = time.getMinutes().toString().padStart(2, "0");
         
-        if (year === currentYear) {
-            timeDisplay = `${dd} ${month}, ${hh}:${mm}`;
-        } else {
-            timeDisplay = `${dd} ${month} ${year}, ${hh}:${mm}`;
+        // Check if message is older than 24 hours
+        const now = new Date();
+        const diffMs = now.getTime() - time.getTime();
+        const isOlderThan24Hours = diffMs > MILLISECONDS_IN_DAY;
+        
+        // Format timestamp
+        let display = `${hh}:${mm}`;
+        if (isOlderThan24Hours) {
+            const dd = time.getDate().toString().padStart(2, "0");
+            const month = MONTH_NAMES[time.getMonth()];
+            const year = time.getFullYear();
+            const currentYear = now.getFullYear();
+            
+            if (year === currentYear) {
+                display = `${dd} ${month}, ${hh}:${mm}`;
+            } else {
+                display = `${dd} ${month} ${year}, ${hh}:${mm}`;
+            }
         }
-    }
+        return display;
+    }, [message.createdAt]);
 
     const handleEdit = () => {
         if (editText.trim() && editText !== message.text) {
