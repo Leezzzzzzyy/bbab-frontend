@@ -14,6 +14,20 @@ import {
     View,
 } from "react-native";
 
+// Маппинг ответа API в ваш интерфейс User
+function mapApiUserToUser(apiUser: any): User {
+  return {
+    id: apiUser.ID,
+    username: apiUser.Username ?? null,
+    password: apiUser.Password,
+    phone: apiUser.Phone ?? null,
+    createdAt: apiUser.CreatedAt ?? null,
+    updatedAt: apiUser.UpdatedAt ?? null,
+    deletedAt: apiUser.DeletedAt ?? null,
+    chats: apiUser.Chats ?? [], 
+  };
+}
+
 export default function ProfileScreen() {
     const {credentials, clearCredentials} = useAuth();
     const router = useRouter();
@@ -29,8 +43,11 @@ export default function ProfileScreen() {
             }
 
             try {
-                const userData = await userAPI.getCurrentUser(credentials.token);
+                console.log('starting to get current user info');
+                const apiuserData = await userAPI.getCurrentUser(credentials.token);
+                const userData = mapApiUserToUser(apiuserData);
                 setUser(userData);
+                console.log(userData);
             } catch (error) {
                 console.error("[ProfileScreen] Failed to load user data:", error);
             } finally {
