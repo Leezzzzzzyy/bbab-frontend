@@ -48,7 +48,7 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   };
 
   const handlePhone = async () => {
-    const cleanNumber = viewedPhoneNumber.replace(/\D/g, "");
+    const cleanNumber = '+7'+viewedPhoneNumber.replace(/\D/g, "");
     setPhoneNumber(cleanNumber);
     console.log(cleanNumber);
 

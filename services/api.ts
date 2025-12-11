@@ -377,36 +377,6 @@ export const chatAPI = {
         return handleResponse(response);
     },
 
-    /**
-     * WebSocket connection to /chat/{id}/ws
-     * Upgrade the HTTP connection to WebSocket and join a specific chat room for real-time communication
-     *
-     * Protocol: ws:// or wss:// (depending on environment)
-     * Headers: Authorization: Bearer <JWT>
-     *
-     * Client → Server examples:
-     * { "type": "message", "message": "Hello everyone!" }
-     *
-     * Server → Client examples:
-     * { "type": "history", "messages": [ { "ChatID": 1, "SenderID": 2, "Message": "Hi!" } ] }
-     * { "type": "message", "message": { "ChatID": 1, "SenderID": 3, "Message": "Hey there!" } }
-     * { "type": "user_joined", "user_id": 2 }
-     * { "type": "user_left", "user_id": 2 }
-     */
-    connectWebSocket: (chatId: number, token: string): WebSocket => {
-        const wsProtocol = "ws://"; // Use wss:// for production
-        const wsUrl = `${wsProtocol}94.241.170.140:8080/api/chat/${chatId}/ws`;
-        const ws = new WebSocket(wsUrl);
-
-        // Set authorization header (note: WebSocket doesn't support custom headers in all environments)
-        // Some implementations may require token in URL or message
-        ws.onopen = () => {
-            // Send token as first message if needed
-            ws.send(JSON.stringify({type: "auth", token}));
-        };
-
-        return ws;
-    },
 };
 
 // ============================================================================
