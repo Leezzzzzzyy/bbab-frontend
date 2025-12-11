@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -41,15 +42,31 @@ export default function ProfileScreen() {
     }, [credentials?.token]);
 
     const handleLogout = async () => {
-        setIsLoggingOut(true);
-        try {
-            await clearCredentials();
-            router.replace("/(auth)");
-        } catch (error) {
-            console.error("[ProfileScreen] Failed to logout:", error);
-        } finally {
-            setIsLoggingOut(false);
-        }
+        Alert.alert(
+            "Выход из аккаунта",
+            "Вы уверены, что хотите выйти из аккаунта?",
+            [
+                {
+                    text: "Отмена",
+                    style: "cancel",
+                },
+                {
+                    text: "Выйти",
+                    style: "destructive",
+                    onPress: async () => {
+                        setIsLoggingOut(true);
+                        try {
+                            await clearCredentials();
+                            router.replace("/(auth)");
+                        } catch (error) {
+                            console.error("[ProfileScreen] Failed to logout:", error);
+                        } finally {
+                            setIsLoggingOut(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const formatDate = (dateString: string) => {

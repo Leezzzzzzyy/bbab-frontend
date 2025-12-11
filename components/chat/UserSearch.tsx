@@ -98,13 +98,15 @@ export default function UserSearch({onClose}: UserSearchProps) {
         },
         credentials.token
       );
+      // Close modal before navigation
+      onClose?.();
       // Навигация к чату
       router.push(`/messages/${resultChat.id}`);
     } catch (err) {
       console.error("[CreateChat] Ошибка создания чата:", err);
     }
   },
-  [router, credentials]
+  [router, credentials, onClose]
 );
 
     const renderUserItem = useCallback(

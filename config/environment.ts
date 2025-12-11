@@ -6,8 +6,8 @@
 export const ENVIRONMENT = {
     // Production
     production: {
-        API_BASE_URL: "http://94.241.170.140:8080/api",
-        WS_BASE_URL: "ws://94.241.170.140:8080/api",
+        API_BASE_URL: "https://amber.thatusualguy.ru/api",
+        WS_BASE_URL: "wss://amber.thatusualguy.ru/api",
     },
     // Development (local)
     development: {
