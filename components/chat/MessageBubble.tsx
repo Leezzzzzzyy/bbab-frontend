@@ -24,6 +24,27 @@ export default function MessageBubble({
     const time = new Date(message.createdAt);
     const hh = time.getHours().toString().padStart(2, "0");
     const mm = time.getMinutes().toString().padStart(2, "0");
+    
+    // Check if message is older than 24 hours
+    const now = new Date();
+    const diffMs = now.getTime() - time.getTime();
+    const isOlderThan24Hours = diffMs > 24 * 60 * 60 * 1000;
+    
+    // Format timestamp
+    let timeDisplay = `${hh}:${mm}`;
+    if (isOlderThan24Hours) {
+        const dd = time.getDate().toString().padStart(2, "0");
+        const monthNames = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+        const month = monthNames[time.getMonth()];
+        const year = time.getFullYear();
+        const currentYear = now.getFullYear();
+        
+        if (year === currentYear) {
+            timeDisplay = `${dd} ${month}, ${hh}:${mm}`;
+        } else {
+            timeDisplay = `${dd} ${month} ${year}, ${hh}:${mm}`;
+        }
+    }
 
     const handleEdit = () => {
         if (editText.trim() && editText !== message.text) {
@@ -181,7 +202,7 @@ export default function MessageBubble({
                                     fontSize: 11,
                                 }}
                             >
-                                {hh}:{mm}
+                                {timeDisplay}
                                 {message.updatedAt && " (edited)"}
                             </Text>
                             {/* Read receipts indicator */}
