@@ -236,6 +236,13 @@ class ChatStore {
             }
         }
 
+        // Clear any pending reconnect timer before starting new connection
+        const pendingTimer = this.reconnectTimers.get(dialogId);
+        if (pendingTimer) {
+            clearTimeout(pendingTimer);
+            this.reconnectTimers.delete(dialogId);
+        }
+
         // Save token for reconnection
         this.wsTokens.set(dialogId, token);
 
@@ -264,6 +271,12 @@ class ChatStore {
                     emitter.emit(`chat:status:${dialogId}`, "connected");
                     // Reset reconnection attempts on successful connection
                     this.reconnectAttempts.set(dialogId, 0);
+                    // Clear any pending reconnect timer
+                    const pendingTimer = this.reconnectTimers.get(dialogId);
+                    if (pendingTimer) {
+                        clearTimeout(pendingTimer);
+                        this.reconnectTimers.delete(dialogId);
+                    }
                 }
             };
 
@@ -319,7 +332,7 @@ class ChatStore {
         // If already trying to reconnect, don't schedule another one
         const existingTimer = this.reconnectTimers.get(dialogId);
         if (existingTimer) {
-            console.log(`Reconnection already scheduled for chat ${dialogId}`);
+            console.log(`Reconnection already scheduled for chat ${dialogId}, skipping duplicate request`);
             return;
         }
 
@@ -346,6 +359,8 @@ class ChatStore {
         console.log(`Scheduling reconnect for chat ${dialogId} in ${delay}ms (attempt ${attempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})`);
 
         const timer = setTimeout(() => {
+            // Clear the timer from map before attempting reconnect
+            this.reconnectTimers.delete(dialogId);
             this.reconnectAttempts.set(dialogId, attempts + 1);
             emitter.emit(`chat:status:${dialogId}`, "reconnecting");
             this.connectWebSocket(dialogId, token);
