@@ -159,7 +159,7 @@ export const authAPI = {
      * POST /initlogin
      * Start SMS login procedure by sending a verification code to the provided phone number
      */
-    initLogin: async (data: SMSLoginRequest): Promise<{ message: string }> => {
+    initLogin: async (data: SMSLoginRequest): Promise<{ message: string, user_exists: boolean }> => {
         const response = await fetch(`${API_BASE_URL}/initlogin`, {
             method: "POST",
             headers: getAuthHeader(),
@@ -218,7 +218,7 @@ export const userAPI = {
      * Return the authenticated user's profile
      */
     getCurrentUser: async (token: string): Promise<User> => {
-        const response = await fetch(`${API_BASE_URL}/user/me`, {
+        const response = await fetch(`${API_BASE_URL}/me`, {
             method: "GET",
             headers: getAuthHeader(token),
         });

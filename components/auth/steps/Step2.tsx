@@ -1,5 +1,8 @@
 import colors from "@/assets/colors";
+import { useAuth } from "@/context";
 import { usePhone } from "@/context/PhoneContext";
+import { authAPI, chatStore, userAPI } from "@/services";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Image,
@@ -17,12 +20,15 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   onNext,
   onBack,
 }) => {
-  const { phoneNumber, setConfirmationCode } = usePhone();
+  const { phoneNumber, setConfirmationCode, isLoggined } = usePhone();
   const [code, setCode] = useState<string>("");
   const [isCodeResendable, setIsCodeResendable] = useState<boolean>(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const { setCredentials } = useAuth();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const router = useRouter();
 
   const swipeBack = Gesture.Pan()
     .minDistance(20)
@@ -46,19 +52,41 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
     return () => clearTimeout(timer);
   }, [timeLeft]);
 
+  const handleIsLoggined = async () => {
+    const response = await authAPI.confirmLogin({
+      phone: `${phoneNumber}`,
+      code: code,
+    });
+    Keyboard.dismiss();
+    // Token received, save it and navigate to main app
+    console.log("Login successful, token:", response.token);
+    
+    console.log('Starting to get current user info');
+    // Get current user info
+    const currentUser = await userAPI.getCurrentUser(response.token);
+    console.log("Current user:", currentUser);
+
+    // Save credentials to storage
+    await setCredentials({
+      token: response.token,
+      username: currentUser.username,
+      userId: currentUser.id,
+      phone: `+7${phoneNumber}`,
+    });
+
+    // Initialize ChatStore with current user ID
+    chatStore.setCurrentUserId(currentUser.id);
+
+    // Navigate to main app
+    router.replace("/messages");
+  }
+
   useEffect(() => {
     if (code.length === 5) {
-      // if (code !== "25863") {
-      //   setErrorMessage("Код подтверждения неверен");
-
-      //   setTimeout(() => {
-      //     setCode("");
-      //   }, 1000);
-
-      //   return;
-      // }
-
-      // Save confirmation code to context
+      if (isLoggined) {
+        handleIsLoggined();
+        return;
+      }
       setConfirmationCode(code);
 
       Keyboard.dismiss();
