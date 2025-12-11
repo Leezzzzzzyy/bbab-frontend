@@ -88,7 +88,7 @@ export default function UserSearch({onClose}: UserSearchProps) {
     if (!credentials?.token) return;
 
     try {
-      // Можно дать читаемое имя:
+      // Создаём имя чата из имён пользователей
       const chatName = user.username || user.phone || "Чат";
       // user_ids - массив id пользователей в чате, обычно [вы, выбранный пользователь]
       const resultChat = await chatAPI.createChat(
@@ -98,9 +98,19 @@ export default function UserSearch({onClose}: UserSearchProps) {
         },
         credentials.token
       );
+
+      // Add new dialog to the chat store
+      if (resultChat && resultChat.id) {
+        chatStore.addDialog({
+          id: resultChat.id,
+          name: chatName,
+        });
+      }
+
       // Close modal before navigation
       onClose?.();
-      // Навигация к чату
+
+      // Navigate to the new chat
       router.push(`/messages/${resultChat.id}`);
     } catch (err) {
       console.error("[CreateChat] Ошибка создания чата:", err);

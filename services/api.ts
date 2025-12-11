@@ -47,7 +47,7 @@ export interface User {
 }
 
 export interface Chat {
-    id: number;
+    ID: number;
     name: string;
     createdAt: string;
     updatedAt: string;

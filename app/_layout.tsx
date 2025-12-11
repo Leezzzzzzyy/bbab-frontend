@@ -14,6 +14,8 @@ function RootLayoutContent() {
   useEffect(() => {
     if (authLoading) return;
 
+    console.log('[RootLayout] Auth status:', { isSignedIn, userId: credentials?.userId, username: credentials?.username });
+
     // Initialize ChatStore with current user ID
     if (isSignedIn && credentials?.userId) {
       chatStore.setCurrentUserId(credentials.userId);
