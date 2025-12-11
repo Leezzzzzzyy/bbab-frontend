@@ -23,6 +23,7 @@ export default function ChatScreen() {
     const {dialogId} = useLocalSearchParams<{ dialogId: string }>();
     const nav = useNavigation();
     const {credentials} = useAuth();
+    const currentUserId = credentials?.userId;
 
     const dialogIdNum = useMemo(() => (dialogId ? parseInt(dialogId) : null), [dialogId]);
     const dialog = useMemo(
@@ -89,7 +90,7 @@ export default function ChatScreen() {
         const connectChat = async () => {
             try {
                 setIsConnecting(true);
-                await chatStore.connectToChat(dialogIdNum, credentials.token);
+                await chatStore.connectToChat(dialogIdNum, credentials.token!);
 
                 // Load initial messages
                 // const {messages: initialMessages} = chatStore.getMessages(dialogIdNum, undefined, 50);
@@ -203,7 +204,7 @@ export default function ChatScreen() {
                             data={[...messages].reverse()}
                             keyExtractor={(item) => (item.id ? `msg-${item.id}` : `msg-${item.timestamp}`)}
                             renderItem={({item}) => {
-                                const isMe = item.senderId === chatStore.currentUserId;
+                                const isMe = item.senderId === currentUserId;
                                 const senderName = senderNames[item.senderId];
 
                                 // Load sender name if not Me and not cached
@@ -211,7 +212,7 @@ export default function ChatScreen() {
                                     chatStore.getUser(item.senderId).then((user) => {
                                         setSenderNames((prev) => ({
                                             ...prev,
-                                            [item.senderId]: user.username || "Неизвестно",
+                                            [item.senderId]: user.Username || "Неизвестно",
                                         }));
                                     });
                                 }

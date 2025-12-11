@@ -37,7 +37,9 @@ export interface TokenResponse {
 
 export interface User {
     id: number;
+    ID: number;
     username?: string | null;
+    Username?: string | null;
     password?: string;
     phone?: string | null;
     createdAt?: string | null;

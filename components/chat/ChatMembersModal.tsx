@@ -146,11 +146,11 @@ export default function ChatMembersModal({
     };
 
     const renderMember = ({ item }: { item: User }) => {
-        const displayName = item.username || "Неизвестно";
+        const displayName = item.Username || "Неизвестно";
         return (
             <View style={styles.memberItem}>
                 <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{getInitials(item.username)}</Text>
+                    <Text style={styles.memberAvatarText}>{getInitials(item.Username)}</Text>
                 </View>
                 <View style={styles.memberInfo}>
                     <Text style={styles.memberName}>{displayName}</Text>
