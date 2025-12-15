@@ -108,20 +108,17 @@ export default function ChatScreen() {
         connectChat();
 
         // Subscribe to new messages
-        const offMessages = chatStore.subscribeMessages(dialogIdNum, (m) => {
-            setMessages((prev) => {
-                if (m.id && prev.some((msg) => msg.id === m.id)) {
-                    return prev;
-                }
-                return [...prev, m];
-            });
+        const offMessages = chatStore.subscribeMessages(dialogIdNum, () => {
+            const {messages: next} = chatStore.getMessages(dialogIdNum, undefined, 1000);
+            setMessages(next);
             requestAnimationFrame(() => listRef.current?.scrollToOffset({offset: 0, animated: true}));
         });
 
         const offHistory = chatStore.subscribeHistory(dialogIdNum, ({messages: history}) => {
             console.debug(`History loaded for chat ${dialogIdNum}:`, history.length, history);
-            setMessages(history);
-            setHasMore(history.length >= 50);
+            const {messages: next} = chatStore.getMessages(dialogIdNum, undefined, 1000);
+            setMessages(next);
+            setHasMore(next.length >= 50);
             setCursor(undefined);
         });
 

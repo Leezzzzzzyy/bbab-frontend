@@ -229,13 +229,17 @@ class ChatStore {
     private connectWebSocket(dialogId: number, token: string) {
         // Prevent multiple concurrent connection attempts
         const currentState = this.connectionStates.get(dialogId);
+        const existing = this.activeConnections.get(dialogId);
+        if (existing && existing.readyState === WebSocket.OPEN) {
+            console.log(`Already connected to chat ${dialogId}, skip reconnect`);
+            return;
+        }
         if (currentState === "connecting") {
             console.log(`Already connecting to chat ${dialogId}, skipping duplicate request`);
             return;
         }
 
         // Close existing connection if any
-        const existing = this.activeConnections.get(dialogId);
         if (existing && existing.readyState !== WebSocket.CLOSED) {
             try {
                 // Mark as intentional disconnection before closing existing connection
@@ -331,6 +335,7 @@ class ChatStore {
               closeCode === 1008 || // policy violation (often auth)
               closeCode === 4001 ||
               closeCode === 4401 ||
+              closeCode === 1000 || // normal close - don't hammer reconnects
               closeReason.includes("unauth") ||
               closeReason.includes("forbidden");
 
@@ -380,8 +385,8 @@ class ChatStore {
 
         // Prevent reconnecting if still in connecting state
         const currentState = this.connectionStates.get(dialogId);
-        if (currentState === "connecting") {
-            console.log(`Still connecting to chat ${dialogId}, not scheduling reconnect`);
+        if (currentState === "connecting" || currentState === "connected") {
+            console.log(`State=${currentState} for chat ${dialogId}, not scheduling reconnect`);
             return;
         }
 
