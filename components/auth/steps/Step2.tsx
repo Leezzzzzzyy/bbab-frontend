@@ -127,13 +127,13 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
           <Text style={styles.informationText}>
             Мы отправили SMS с кодом проверки{"\n"}на Ваш телефон +7
             {"(" +
-              phoneNumber.slice(1, 4) +
+              phoneNumber.slice(1+1, 4+1) +
               ") " +
-              phoneNumber.slice(4, 7) +
+              phoneNumber.slice(4+1, 7+1) +
               "-" +
-              phoneNumber.slice(7, 9) +
+              phoneNumber.slice(7+1, 9+1) +
               "-" +
-              phoneNumber.slice(10)}
+              phoneNumber.slice(10+1)}
           </Text>
 
           <CodeField
