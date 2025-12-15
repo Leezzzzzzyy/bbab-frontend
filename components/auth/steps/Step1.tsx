@@ -15,7 +15,7 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const [viewedPhoneNumber, setViewedPhoneNumber] = useState("");
   const inputRef = useRef<TextInput>(null);
 
-  const { setPhoneNumber } = usePhone();
+  const { setPhoneNumber, setIsLoggined } = usePhone();
 
   const formatPhoneNumber = (text: string) => {
     // Удаляем все нецифровые символы
@@ -48,7 +48,7 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   };
 
   const handlePhone = async () => {
-    const cleanNumber = viewedPhoneNumber.replace(/\D/g, "");
+    const cleanNumber = '+7'+viewedPhoneNumber.replace(/\D/g, "");
     setPhoneNumber(cleanNumber);
     console.log(cleanNumber);
 
@@ -56,6 +56,9 @@ export const Step1: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       const response = await authAPI.initLogin({
         phone: cleanNumber,
       });
+      if (response.user_exists) {
+        setIsLoggined(true);
+      }
 
       console.log(response.message);
     } catch (error) {

@@ -5,6 +5,7 @@ export default {
   accent: "#ffb356",
   contrast: "#c96f00",
   maintext: "#fff",
+  text: "#fff",
   additionalText: "#ffe9d1",
   additionalWhite: "#fff4e5",
   error: "#ff5353",

@@ -5,7 +5,7 @@ import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 export default function AuthIndex() {
-  const { fontsLoadded } = useAppFonts();
+  const { fontsLoadded: _ } = useAppFonts();
 
   const router = useRouter();
 

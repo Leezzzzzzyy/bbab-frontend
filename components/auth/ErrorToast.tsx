@@ -18,6 +18,25 @@ export const ErrorToast: React.FC<ErrorToastProps> = ({
     const translateY = React.useRef(new Animated.Value(-100)).current;
     const opacity = React.useRef(new Animated.Value(0)).current;
 
+    const hideToast = () => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: -100,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            onHide();
+        });
+    };
+
+
+
     React.useEffect(() => {
         if (isVisible) {
             Animated.parallel([
@@ -39,24 +58,8 @@ export const ErrorToast: React.FC<ErrorToastProps> = ({
 
             return () => clearTimeout(timer);
         }
-    }, [isVisible]);
+    }, [isVisible, duration, hideToast, opacity, translateY]);
 
-    const hideToast = () => {
-        Animated.parallel([
-            Animated.timing(translateY, {
-                toValue: -100,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onHide();
-        });
-    };
 
     const panResponder = PanResponder.create({
         onStartShouldSetPanResponder: () => true,

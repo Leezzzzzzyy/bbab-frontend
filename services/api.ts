@@ -3,7 +3,7 @@
  * Handles all HTTP requests to the backend API
  * Base URL: http://94.241.170.140:8080/api
  */
-import {API_BASE_URL} from "@/config/environment";
+import { API_BASE_URL } from "@/config/environment";
 
 
 // ============================================================================
@@ -37,17 +37,19 @@ export interface TokenResponse {
 
 export interface User {
     id: number;
-    username: string;
+    ID: number;
+    username?: string | null;
+    Username?: string | null;
     password?: string;
-    phone?: string;
-    createdAt: string;
-    updatedAt: string;
+    phone?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
     deletedAt?: string | null;
     chats?: Chat[];
 }
 
 export interface Chat {
-    id: number;
+    ID: number;
     name: string;
     createdAt: string;
     updatedAt: string;
@@ -57,6 +59,7 @@ export interface Chat {
 }
 
 export interface Message {
+    type: string;
     id: number;
     chatID: number;
     senderID: number;
@@ -158,7 +161,7 @@ export const authAPI = {
      * POST /initlogin
      * Start SMS login procedure by sending a verification code to the provided phone number
      */
-    initLogin: async (data: SMSLoginRequest): Promise<{ message: string }> => {
+    initLogin: async (data: SMSLoginRequest): Promise<{ message: string, user_exists: boolean }> => {
         const response = await fetch(`${API_BASE_URL}/initlogin`, {
             method: "POST",
             headers: getAuthHeader(),
@@ -217,7 +220,7 @@ export const userAPI = {
      * Return the authenticated user's profile
      */
     getCurrentUser: async (token: string): Promise<User> => {
-        const response = await fetch(`${API_BASE_URL}/user/me`, {
+        const response = await fetch(`${API_BASE_URL}/me`, {
             method: "GET",
             headers: getAuthHeader(token),
         });
@@ -323,6 +326,7 @@ export const chatAPI = {
      */
     getChatMessages: async (
         chatId: number,
+        token: string,
         cursor?: string,
         limit: number = 20,
         direction: "older" | "newer" = "older"
@@ -334,19 +338,19 @@ export const chatAPI = {
 
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}/messages?${params.toString()}`, {
             method: "GET",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },
 
     /**
      * GET /chat/{id}
-     * Retrieve all messages from a chat by its ID. Cached messages are returned from Redis if available
+     * Retrieve all messages from a chat by its ID
      */
-    getChat: async (chatId: number): Promise<Message[]> => {
+    getChat: async (chatId: number, token: string): Promise<Message[]> => {
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}`, {
             method: "GET",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },
@@ -375,36 +379,6 @@ export const chatAPI = {
         return handleResponse(response);
     },
 
-    /**
-     * WebSocket connection to /chat/{id}/ws
-     * Upgrade the HTTP connection to WebSocket and join a specific chat room for real-time communication
-     *
-     * Protocol: ws:// or wss:// (depending on environment)
-     * Headers: Authorization: Bearer <JWT>
-     *
-     * Client → Server examples:
-     * { "type": "message", "message": "Hello everyone!" }
-     *
-     * Server → Client examples:
-     * { "type": "history", "messages": [ { "ChatID": 1, "SenderID": 2, "Message": "Hi!" } ] }
-     * { "type": "message", "message": { "ChatID": 1, "SenderID": 3, "Message": "Hey there!" } }
-     * { "type": "user_joined", "user_id": 2 }
-     * { "type": "user_left", "user_id": 2 }
-     */
-    connectWebSocket: (chatId: number, token: string): WebSocket => {
-        const wsProtocol = "ws://"; // Use wss:// for production
-        const wsUrl = `${wsProtocol}94.241.170.140:8080/api/chat/${chatId}/ws`;
-        const ws = new WebSocket(wsUrl);
-
-        // Set authorization header (note: WebSocket doesn't support custom headers in all environments)
-        // Some implementations may require token in URL or message
-        ws.onopen = () => {
-            // Send token as first message if needed
-            ws.send(JSON.stringify({type: "auth", token}));
-        };
-
-        return ws;
-    },
 };
 
 // ============================================================================

@@ -8,8 +8,9 @@ import React, {
 } from "react";
 
 export interface AuthCredentials {
-  token: string;
-  username: string;
+  token?: string;
+  username?: string | null;
+  userId?: number;
   phone?: string;
 }
 
