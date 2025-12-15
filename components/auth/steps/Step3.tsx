@@ -6,12 +6,10 @@ import { chatStore } from "@/services/chat";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Keyboard,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import AvatarPicker from "../AvatarPicker";
@@ -80,46 +78,41 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   return (
-    <TouchableWithoutFeedback
-      accessible={false}
-      onPress={() => Keyboard.dismiss()}
-    >
-      <View style={styles.stepContainer}>
-        <ErrorToast
-          message={errorMessage || ""}
-          isVisible={!!errorMessage}
-          onHide={handleErrorHide}
-          duration={5000}
-        />
+    <View style={styles.stepContainer}>
+      <ErrorToast
+        message={errorMessage || ""}
+        isVisible={!!errorMessage}
+        onHide={handleErrorHide}
+        duration={5000}
+      />
 
-        <Text style={styles.caption}>Настройка профиля</Text>
-        <View style={styles.inputContainerWrapper}>
-          <AvatarPicker />
-          <View style={styles.inputsContainer}>
-            <TextInput
-              style={styles.inputField}
-              placeholderTextColor={colors.additionalText + "60"}
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Название аккаунта"
-            />
-            <TextInput
-              style={styles.inputField}
-              placeholderTextColor={colors.additionalText + "60"}
-              value={name}
-              onChangeText={setName}
-              placeholder="Имя"
-            />
-          </View>
+      <Text style={styles.caption}>Настройка профиля</Text>
+      <View style={styles.inputContainerWrapper}>
+        <AvatarPicker />
+        <View style={styles.inputsContainer}>
+          <TextInput
+            style={styles.inputField}
+            placeholderTextColor={colors.additionalText + "60"}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Название аккаунта"
+          />
+          <TextInput
+            style={styles.inputField}
+            placeholderTextColor={colors.additionalText + "60"}
+            value={name}
+            onChangeText={setName}
+            placeholder="Имя"
+          />
         </View>
-        <TouchableOpacity
-          onPress={endAuthorization}
-          style={styles.endAuthButton}
-        >
-          <Text style={styles.endAuthText}>ЗАВЕРШИТЬ</Text>
-        </TouchableOpacity>
       </View>
-    </TouchableWithoutFeedback>
+      <TouchableOpacity
+        onPress={endAuthorization}
+        style={styles.endAuthButton}
+      >
+        <Text style={styles.endAuthText}>ЗАВЕРШИТЬ</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
