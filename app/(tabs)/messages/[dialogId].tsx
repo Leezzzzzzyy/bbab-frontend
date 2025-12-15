@@ -110,11 +110,9 @@ export default function ChatScreen() {
         // Subscribe to new messages
         const offMessages = chatStore.subscribeMessages(dialogIdNum, (m) => {
             setMessages((prev) => {
-                // Check if message already exists
-                // if (prev.find((msg) => msg.id === m.id)) {
-                //     console.log( "duplicate id", m.id, prev)
-                //     return prev;
-                // }
+                if (m.id && prev.some((msg) => msg.id === m.id)) {
+                    return prev;
+                }
                 return [...prev, m];
             });
             requestAnimationFrame(() => listRef.current?.scrollToOffset({offset: 0, animated: true}));
@@ -203,7 +201,7 @@ export default function ChatScreen() {
                         <FlatList
                             ref={listRef}
                             data={[...messages].reverse()}
-                            keyExtractor={(item) => (item.id ? `msg-${item.id}` : `msg-${item.timestamp}`)}
+                            keyExtractor={(item) => (item.id ? `msg-${dialogIdNum}-${item.id}` : `msg-${dialogIdNum}-${item.timestamp}-${item.senderId}`)}
                             renderItem={({item}) => {
                                 const isMe = item.senderId === currentUserId;
                                 const senderName = senderNames[item.senderId];

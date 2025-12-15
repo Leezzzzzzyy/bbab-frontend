@@ -69,13 +69,16 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
     // Save credentials to storage
     await setCredentials({
       token: response.token,
-      username: currentUser.username,
-      userId: currentUser.id,
+      username: currentUser.username ?? currentUser.Username ?? "",
+      userId: (currentUser as any)?.id ?? (currentUser as any)?.ID,
       phone: `+7${phoneNumber}`,
     });
 
     // Initialize ChatStore with current user ID
-    chatStore.setCurrentUserId(currentUser.id);
+    const uid = (currentUser as any)?.id ?? (currentUser as any)?.ID;
+    if (uid) {
+      chatStore.setCurrentUserId(uid);
+    }
 
     // Navigate to main app
     router.replace("/messages");

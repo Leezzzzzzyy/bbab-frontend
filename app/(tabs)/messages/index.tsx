@@ -6,6 +6,8 @@ import React, {useEffect, useState} from "react";
 import {FlatList, Text, View, Pressable, ActivityIndicator, Alert, Modal, SafeAreaView} from "react-native";
 import UserSearch from "@/components/chat/UserSearch";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 
 export default function MessagesIndex() {
@@ -14,26 +16,31 @@ export default function MessagesIndex() {
     const [isLoading, setIsLoading] = useState(true);
     const {credentials} = useAuth();
 
+    const loadDialogs = useCallback(async () => {
+        if (!credentials?.token) return;
+        try {
+            setIsLoading(true);
+            await chatStore.loadDialogs(credentials.token);
+            setDialogs(chatStore.listDialogs());
+        } catch (error) {
+            console.error("Failed to load dialogs:", error);
+            Alert.alert("Error", "Failed to load chats. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [credentials?.token]);
+
     useEffect(() => {
-        const loadDialogs = async () => {
-            if (!credentials?.token) return;
-            try {
-                setIsLoading(true);
-                await chatStore.loadDialogs(credentials.token);
-                setDialogs(chatStore.listDialogs());
-            } catch (error) {
-                console.error("Failed to load dialogs:", error);
-                Alert.alert("Error", "Failed to load chats. Please try again.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         loadDialogs();
-
         const off = chatStore.subscribeDialogs((d) => setDialogs(d.slice()));
         return () => off();
-    }, [credentials?.token]);
+    }, [credentials?.token, loadDialogs]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadDialogs();
+        }, [loadDialogs])
+    );
 
     return (
         <SafeAreaView style={{flex: 1, backgroundColor: colors.background, padding: 16}}>

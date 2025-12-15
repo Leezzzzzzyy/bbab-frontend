@@ -311,7 +311,7 @@ class ChatStore {
                 emitter.emit(`chat:status:${dialogId}`, "error");
             };
 
-            ws.onclose = () => {
+            ws.onclose = (event) => {
                 // Check if this was an intentional disconnection
                 const wasIntentional = this.intentionallyDisconnected.has(dialogId);
 
@@ -324,15 +324,30 @@ class ChatStore {
                     return;
                 }
 
-                // Only attempt reconnection if this was an unexpected close
-                const state = this.connectionStates.get(dialogId);
-                console.log(`WebSocket closed for chat ${dialogId}, state: ${state}`);
-                this.activeConnections.delete(dialogId);
-                this.connectionStates.set(dialogId, "disconnected");
-                emitter.emit(`chat:status:${dialogId}`, "disconnected");
+            // Inspect close reason — avoid endless retries on auth/forbidden errors
+            const closeCode = event?.code;
+            const closeReason = event?.reason?.toLowerCase?.() || "";
+            const shouldStop =
+              closeCode === 1008 || // policy violation (often auth)
+              closeCode === 4001 ||
+              closeCode === 4401 ||
+              closeReason.includes("unauth") ||
+              closeReason.includes("forbidden");
 
-                // Attempt to reconnect
-                this.scheduleReconnect(dialogId, token);
+            // Only attempt reconnection if this was an unexpected close
+            const state = this.connectionStates.get(dialogId);
+            console.log(`WebSocket closed for chat ${dialogId}, state: ${state}, code: ${closeCode}, reason: ${closeReason}`);
+            this.activeConnections.delete(dialogId);
+            this.connectionStates.set(dialogId, "disconnected");
+            emitter.emit(`chat:status:${dialogId}`, shouldStop ? "error" : "disconnected");
+
+            if (shouldStop) {
+              console.warn(`Stopping reconnects for chat ${dialogId} due to close reason/code`);
+              return;
+            }
+
+            // Attempt to reconnect
+            this.scheduleReconnect(dialogId, token);
             };
 
             this.activeConnections.set(dialogId, ws);
@@ -349,6 +364,13 @@ class ChatStore {
      * Schedule WebSocket reconnection with exponential backoff
      */
     private scheduleReconnect(dialogId: number, token: string) {
+    // Do not reconnect if we no longer have a token stored
+    const tokenToUse = this.wsTokens.get(dialogId) || token;
+    if (!tokenToUse) {
+      console.warn(`No token available to reconnect chat ${dialogId}, aborting`);
+      return;
+    }
+
         // If already trying to reconnect, don't schedule another one
         const existingTimer = this.reconnectTimers.get(dialogId);
         if (existingTimer) {
@@ -383,7 +405,7 @@ class ChatStore {
             this.reconnectTimers.delete(dialogId);
             this.reconnectAttempts.set(dialogId, attempts + 1);
             emitter.emit(`chat:status:${dialogId}`, "reconnecting");
-            this.connectWebSocket(dialogId, token);
+      this.connectWebSocket(dialogId, tokenToUse);
         }, delay);
 
         this.reconnectTimers.set(dialogId, timer);
@@ -500,7 +522,6 @@ class ChatStore {
                 if (data.messages && Array.isArray(data.messages)) {
                     const messages = data.messages
                         .map((msg: any) => {
-                            // Filter out invalid messages
                             if (!msg.ID) return null;
                             return {
                                 id: msg.ID,
@@ -512,22 +533,18 @@ class ChatStore {
                         })
                         .filter((msg): msg is Message => msg !== null);
 
-                    // Merge with existing messages (might have new messages that arrived before history)
+                    // Merge history with existing, де-дуп по id
                     const existing = this.messagesByDialog.get(dialogId) ?? [];
-                    const existingIds = new Set(existing.map(m => m.id));
+                    const byId = new Map<number, Message>();
+                    for (const m of existing) byId.set(m.id, m);
+                    for (const m of messages) byId.set(m.id, m);
 
-                    // Only add history messages that aren't already in the list
-                    const newFromHistory = messages.filter(m => !existingIds.has(m.id));
-                    const merged = [...newFromHistory];
-
-                    // Sort by timestamp
-                    merged.sort((a, b) => a.timestamp - b.timestamp);
+                    const merged = Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
 
                     this.messagesByDialog.set(dialogId, merged);
-                    console.log(`History loaded for chat ${dialogId}: ${messages.length} from history, ${newFromHistory.length} already present, total: ${merged.length}`);
+                    console.log(`History loaded for chat ${dialogId}: ${messages.length} from history, total merged: ${merged.length}`);
                     emitter.emit(`messages:history:${dialogId}`, { dialogId, messages: merged });
                 } else {
-                    // No history messages, keep existing
                     const existing = this.messagesByDialog.get(dialogId) ?? [];
                     console.log(`No history messages for chat ${dialogId}, keeping ${existing.length} existing messages`);
                     emitter.emit(`messages:history:${dialogId}`, { dialogId, messages: existing });
@@ -596,17 +613,25 @@ class ChatStore {
         const arr = this.messagesByDialog.get(dialogId) ?? [];
         // Check if message already exists
         const exists = arr.find((m) => m.id === msg.id);
-        if (!exists) {
-            arr.push(msg);
-            arr.sort((a, b) => a.timestamp - b.timestamp);
-            this.messagesByDialog.set(dialogId, arr);
-            console.log(`Added message ${msg.id} to chat ${dialogId}, total messages: ${arr.length}`);
-            // Only emit and recalc if message was actually added
-            emitter.emit<Message>(`msg:${dialogId}`, msg);
-            this.recalcDialogSummaries();
-        } else {
-            console.log(`Message ${msg.id} already exists in chat ${dialogId}, skipping duplicate`);
+        if (exists) {
+            // if timestamps differ, keep the latest payload
+            if (msg.timestamp > exists.timestamp) {
+                Object.assign(exists, msg);
+                this.messagesByDialog.set(dialogId, [...arr].sort((a, b) => a.timestamp - b.timestamp));
+                emitter.emit<Message>(`msg:${dialogId}`, exists);
+                this.recalcDialogSummaries();
+            } else {
+                console.log(`Message ${msg.id} already exists in chat ${dialogId}, skipping duplicate`);
+            }
+            return;
         }
+
+        arr.push(msg);
+        arr.sort((a, b) => a.timestamp - b.timestamp);
+        this.messagesByDialog.set(dialogId, arr);
+        console.log(`Added message ${msg.id} to chat ${dialogId}, total messages: ${arr.length}`);
+        emitter.emit<Message>(`msg:${dialogId}`, msg);
+        this.recalcDialogSummaries();
     }
 
     /**

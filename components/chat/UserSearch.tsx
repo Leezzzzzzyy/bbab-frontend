@@ -6,6 +6,7 @@
 import colors from "@/assets/colors";
 import { useAuth } from "@/context/AuthContext";
 import { chatAPI, userAPI, type User } from "@/services/api";
+import { chatStore } from "@/services/chat";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -84,30 +85,40 @@ export default function UserSearch({onClose}: UserSearchProps) {
     }, [searchQuery, credentials?.token]);
 
     const handleUserSelect = useCallback(
-  async (user: User) => {
-    if (!credentials?.token) return;
+        async (user: User) => {
+            if (!credentials?.token || !credentials?.userId || !user?.id) return;
 
-    try {
-      // Можно дать читаемое имя:
-      const chatName = user.username +" и "+ credentials.username || user.phone || "Чат";
-      // user_ids - массив id пользователей в чате, обычно [вы, выбранный пользователь]
-      const resultChat = await chatAPI.createChat(
-        {
-          name: chatName,
-          user_ids: [user.id, /* ваш id, если он нужен на бэке */],
+            try {
+                // Читаемое имя чата: "Вы и Пользователь" или запасные варианты
+                const chatName =
+                    `${credentials.username ?? "Вы"} и ${user.username ?? user.phone ?? "пользователь"}`.trim();
+
+                // Создаём чат с обоими участниками (бек всё равно добавит инициатора, но передаем явно)
+                const resultChat = await chatAPI.createChat(
+                    {
+                        name: chatName,
+                        user_ids: [credentials.userId, user.id],
+                    },
+                    credentials.token
+                );
+
+                // Обновляем список диалогов локально
+                await chatStore.loadDialogs(credentials.token);
+
+                // Закрываем модалку перед навигацией
+                onClose?.();
+
+                // Навигация к созданному чату (бек может вернуть ID в разных регистрах)
+                const newChatId = (resultChat as any)?.id ?? (resultChat as any)?.ID;
+                if (newChatId) {
+                    router.push(`/messages/${newChatId}`);
+                }
+            } catch (err) {
+                console.error("[CreateChat] Ошибка создания чата:", err);
+            }
         },
-        credentials.token
-      );
-      // Close modal before navigation
-      onClose?.();
-      // Навигация к чату
-      router.push(`/messages/${resultChat.ID}`);
-    } catch (err) {
-      console.error("[CreateChat] Ошибка создания чата:", err);
-    }
-  },
-  [router, credentials, onClose]
-);
+        [router, credentials, onClose]
+    );
 
     const renderUserItem = useCallback(
         ({item}: {item: User}) => {
