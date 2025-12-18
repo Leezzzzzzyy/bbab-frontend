@@ -52,6 +52,28 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
     return () => clearTimeout(timer);
   }, [timeLeft]);
 
+  const getFormattedPhoneNumber = () => {
+    if (!phoneNumber) return "";
+
+    // Оставляем только цифры
+    const digits = phoneNumber.replace(/\D/g, "");
+
+    // Убираем код страны, если он уже есть (+7 / 7)
+    let local = digits;
+    if (digits.length === 11 && digits.startsWith("7")) {
+      local = digits.slice(1);
+    } else if (digits.length > 10) {
+      local = digits.slice(digits.length - 10);
+    }
+
+    const part1 = local.slice(0, 3);
+    const part2 = local.slice(3, 6);
+    const part3 = local.slice(6, 8);
+    const part4 = local.slice(8, 10);
+
+    return `+7 (${part1}) ${part2}-${part3}-${part4}`;
+  };
+
   const handleIsLoggined = async () => {
     const response = await authAPI.confirmLogin({
       phone: `${phoneNumber}`,
@@ -125,15 +147,8 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
           />
           <Text style={styles.informationCaption}>Введите код</Text>
           <Text style={styles.informationText}>
-            Мы отправили SMS с кодом проверки{"\n"}на Ваш телефон +7
-            {"(" +
-              phoneNumber.slice(1+1, 4+1) +
-              ") " +
-              phoneNumber.slice(4+1, 7+1) +
-              "-" +
-              phoneNumber.slice(7+1, 9+1) +
-              "-" +
-              phoneNumber.slice(10+1)}
+            Мы отправили SMS с кодом проверки{"\n"}на Ваш телефон{" "}
+            {getFormattedPhoneNumber()}
           </Text>
 
           <CodeField
