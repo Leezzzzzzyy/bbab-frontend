@@ -133,7 +133,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
               "-" +
               phoneNumber.slice(7+1, 9+1) +
               "-" +
-              phoneNumber.slice(10+1)}
+              phoneNumber.slice(10)}
           </Text>
 
           <CodeField
