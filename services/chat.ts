@@ -74,6 +74,9 @@ class Emitter {
 
 const emitter = new Emitter();
 
+// Экспортируем emitter для использования в других модулях
+export { emitter as chatEmitter };
+
 // User cache with TTL
 type CachedUser = {
     data: User;
@@ -367,13 +370,25 @@ class ChatStore {
             // Inspect close reason — avoid endless retries on auth/forbidden errors
             const closeCode = event?.code;
             const closeReason = event?.reason?.toLowerCase?.() || "";
-            const shouldStop =
-              closeCode === 1008 || // policy violation (often auth)
+            const isAuthError =
               closeCode === 4001 ||
               closeCode === 4401 ||
-              closeCode === 1000 || // normal close - don't hammer reconnects
+              closeCode === 1008 || // policy violation (often auth)
               closeReason.includes("unauth") ||
-              closeReason.includes("forbidden");
+              closeReason.includes("forbidden") ||
+              closeReason.includes("token") ||
+              closeReason.includes("expired");
+
+            // Если это ошибка авторизации, вызываем глобальный обработчик
+            if (isAuthError) {
+                console.warn(`[ChatStore] WebSocket auth error for chat ${dialogId}, code: ${closeCode}, reason: ${closeReason}`);
+                // Эмитируем событие для глобального обработчика
+                emitter.emit("auth:unauthorized");
+            }
+
+            const shouldStop =
+              isAuthError ||
+              closeCode === 1000; // normal close - don't hammer reconnects
 
             // Only attempt reconnection if this was an unexpected close
             const state = this.connectionStates.get(dialogId);
@@ -885,7 +900,21 @@ class ChatStore {
         // Clear all connection states
         this.connectionStates.clear();
 
-        console.log("Disconnected from all chats");
+        // Clear all messages and dialogs
+        this.messagesByDialog.clear();
+        this.dialogs = [];
+        this.recalcDialogSummaries();
+
+        // Clear typing users
+        this.typingUsers.clear();
+
+        // Clear WebSocket tokens
+        this.wsTokens.clear();
+
+        // Reset current user ID
+        this.currentUserId = null;
+
+        console.log("Disconnected from all chats and cleared all data");
     }
 
     /**

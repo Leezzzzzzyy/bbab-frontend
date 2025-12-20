@@ -1,6 +1,7 @@
 import colors from "@/assets/colors";
 import { AuthProvider, useAuth } from "@/context";
-import { chatStore } from "@/services/chat";
+import { chatStore, chatEmitter } from "@/services/chat";
+import { setUnauthorizedHandler } from "@/services/api";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated } from "react-native";
@@ -19,23 +20,50 @@ function RootLayoutContent() {
     clearCredentials,
   } = useAuth();
 
-  // Сброс сохраненных cred'ов и активных соединений при старте приложения
+  // Настраиваем глобальный обработчик ошибок 401
+  useEffect(() => {
+    const handleUnauthorized = async () => {
+      console.log("[RootLayout] Handling unauthorized error, logging out");
+      try {
+        // Отключаем все соединения
+        chatStore.disconnectAll();
+        // Очищаем credentials
+        await clearCredentials();
+        // Перенаправляем на экран авторизации
+        router.replace("/(auth)");
+      } catch (error) {
+        console.error("[RootLayout] Failed to handle unauthorized error:", error);
+      }
+    };
+
+    // Устанавливаем обработчик для HTTP API ошибок
+    setUnauthorizedHandler(handleUnauthorized);
+
+    // Подписываемся на события WebSocket ошибок авторизации
+    let unsubscribe: (() => void) | null = null;
+    if (chatEmitter) {
+      unsubscribe = chatEmitter.on("auth:unauthorized", handleUnauthorized);
+    }
+
+    return () => {
+      setUnauthorizedHandler(() => {});
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [clearCredentials, router]);
+
+  // Инициализация при старте приложения
   useEffect(() => {
     if (resetRef.current) return;
     resetRef.current = true;
 
-    (async () => {
-      try {
-        await clearCredentials();
-        chatStore.disconnectAll();
-      } catch (error) {
-        console.warn("[RootLayout] Failed to reset credentials on launch", error);
-      } finally {
-        setHasReset(true);
-      }
-    })();
-  }, [clearCredentials]);
+    // Просто помечаем как инициализированное, не трогая данные
+    // Данные должны сохраняться между сессиями
+    setHasReset(true);
+  }, []);
 
+  // Обработка начальной навигации при загрузке приложения
   useEffect(() => {
     if (authLoading || !hasReset || hasNavigatedRef.current) return;
 
@@ -52,15 +80,29 @@ function RootLayoutContent() {
         useNativeDriver: true,
       }).start(() => {
         setIsLoading(false);
-        // Всегда принудительно отправляем на экран авторизации
-        const targetRoute = "/(auth)";
-        router.replace(targetRoute);
+        // Направляем на экран авторизации только если пользователь не авторизован
+        if (!isSignedIn) {
+          const targetRoute = "/(auth)";
+          router.replace(targetRoute);
+        }
         hasNavigatedRef.current = true;
       });
     }, 2000);
 
     return () => clearTimeout(timer);
   }, [router, fadeAnim, isSignedIn, authLoading, credentials?.userId, hasReset]);
+
+  // Отдельный эффект для обработки выхода из аккаунта
+  useEffect(() => {
+    // Если пользователь вышел из аккаунта (был авторизован, но теперь нет)
+    if (!authLoading && !isSignedIn && hasNavigatedRef.current) {
+      console.log("[RootLayout] User logged out, redirecting to auth");
+      // Сбрасываем флаг навигации для возможности новой навигации
+      hasNavigatedRef.current = false;
+      // Перенаправляем на экран авторизации
+      router.replace("/(auth)");
+    }
+  }, [isSignedIn, authLoading, router]);
 
   // Отдельно сохраняем текущий userId для чата после успешной авторизации
   useEffect(() => {

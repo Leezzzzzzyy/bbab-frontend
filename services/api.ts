@@ -114,12 +114,32 @@ export interface PaginationInfo {
 // Helper Functions
 // ============================================================================
 
+// Глобальный обработчик ошибок авторизации
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export function setUnauthorizedHandler(callback: () => void) {
+    onUnauthorizedCallback = callback;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+        // Если получили 401 Unauthorized, вызываем обработчик выхода
+        if (response.status === 401) {
+            console.warn("[API] Received 401 Unauthorized, triggering logout");
+            if (onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+        }
+        
         const error: ErrorResponse = await response.json().catch(() => ({
             message: `HTTP ${response.status}: ${response.statusText}`,
         }));
-        throw new Error(error.message || "API request failed");
+        
+        // Создаем специальный тип ошибки для 401
+        const errorMessage = error.message || "API request failed";
+        const apiError = new Error(errorMessage);
+        (apiError as any).status = response.status;
+        throw apiError;
     }
     return response.json();
 }

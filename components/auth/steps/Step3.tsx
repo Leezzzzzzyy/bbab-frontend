@@ -96,6 +96,15 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             value={username}
             onChangeText={setUsername}
             placeholder="Название аккаунта"
+            editable={true}
+            autoFocus={false}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="default"
+            returnKeyType="next"
+            onSubmitEditing={() => {
+              // Переход к следующему полю при нажатии Enter
+            }}
           />
           <TextInput
             style={styles.inputField}
@@ -103,6 +112,12 @@ export const Step3: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             value={name}
             onChangeText={setName}
             placeholder="Имя"
+            editable={true}
+            autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
+            returnKeyType="done"
+            onSubmitEditing={endAuthorization}
           />
         </View>
       </View>
@@ -152,7 +167,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     fontSize: 18,
     paddingBottom: 4,
+    paddingTop: 4,
+    paddingHorizontal: 4,
     textAlign: "center",
+    minHeight: 40,
+    // Для веб-версии
+    outlineStyle: "none",
+    WebkitAppearance: "none",
   },
   endAuthButton: {
     backgroundColor: colors.main,

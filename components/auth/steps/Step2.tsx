@@ -75,35 +75,43 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   };
 
   const handleIsLoggined = async () => {
-    const response = await authAPI.confirmLogin({
-      phone: `${phoneNumber}`,
-      code: code,
-    });
-    Keyboard.dismiss();
-    // Token received, save it and navigate to main app
-    console.log("Login successful, token:", response.token);
-    
-    console.log('Starting to get current user info');
-    // Get current user info
-    const currentUser = await userAPI.getCurrentUser(response.token);
-    console.log("Current user:", currentUser);
+    try {
+      setErrorMessage(null);
+      const response = await authAPI.confirmLogin({
+        phone: `${phoneNumber}`,
+        code: code,
+      });
+      Keyboard.dismiss();
+      // Token received, save it and navigate to main app
+      console.log("Login successful, token:", response.token);
+      
+      console.log('Starting to get current user info');
+      // Get current user info
+      const currentUser = await userAPI.getCurrentUser(response.token);
+      console.log("Current user:", currentUser);
 
-    // Save credentials to storage
-    await setCredentials({
-      token: response.token,
-      username: currentUser.username ?? currentUser.Username ?? "",
-      userId: (currentUser as any)?.id ?? (currentUser as any)?.ID,
-      phone: `+7${phoneNumber}`,
-    });
+      // Save credentials to storage
+      await setCredentials({
+        token: response.token,
+        username: currentUser.username ?? currentUser.Username ?? "",
+        userId: (currentUser as any)?.id ?? (currentUser as any)?.ID,
+        phone: `+7${phoneNumber}`,
+      });
 
-    // Initialize ChatStore with current user ID
-    const uid = (currentUser as any)?.id ?? (currentUser as any)?.ID;
-    if (uid) {
-      chatStore.setCurrentUserId(uid);
+      // Initialize ChatStore with current user ID
+      const uid = (currentUser as any)?.id ?? (currentUser as any)?.ID;
+      if (uid) {
+        chatStore.setCurrentUserId(uid);
+      }
+
+      // Navigate to main app
+      router.replace("/messages");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      setErrorMessage(error?.message || "Неверный код подтверждения. Попробуйте еще раз.");
+      // Очищаем код при ошибке, чтобы пользователь мог ввести заново
+      setCode("");
     }
-
-    // Navigate to main app
-    router.replace("/messages");
   }
 
   useEffect(() => {
@@ -123,7 +131,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
       }, 1000);
       return;
     }
-  }, [code, onNext, setConfirmationCode]);
+  }, [code, isLoggined, onNext, setConfirmationCode]);
 
   const handleErrorHide = () => {
     setErrorMessage(null);
@@ -160,14 +168,25 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
 
           <CodeField
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => {
+              // Разрешаем ввод только цифр и ограничиваем длину до 5 символов
+              const numericText = text.replace(/[^0-9]/g, '').slice(0, 5);
+              setCode(numericText);
+            }}
             cellCount={5}
             rootStyle={styles.codeFieldRoot}
             keyboardType="number-pad"
             autoFocus={true}
-            renderCell={({ index, symbol }) => (
-              <View key={index} style={[styles.cell]}>
-                <Text style={styles.cellSymbol}>{symbol}</Text>
+            editable={true}
+            renderCell={({ index, symbol, isFocused }) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.cell,
+                  isFocused && { borderBottomColor: colors.accent }
+                ]}
+              >
+                <Text style={styles.cellSymbol}>{symbol || (isFocused ? '|' : '')}</Text>
               </View>
             )}
           />

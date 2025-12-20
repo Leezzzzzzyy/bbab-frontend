@@ -1,6 +1,7 @@
 import colors from "@/assets/colors";
 import { useAuth } from "@/context/AuthContext";
 import { userAPI, type User } from "@/services/api";
+import { chatStore } from "@/services/chat";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -60,31 +61,56 @@ export default function ProfileScreen() {
   }, [credentials?.token]);
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Выход из аккаунта",
-      "Вы уверены, что хотите выйти из аккаунта?",
-      [
-        {
-          text: "Отмена",
-          style: "cancel",
-        },
-        {
-          text: "Выйти",
-          style: "destructive",
-          onPress: async () => {
-            setIsLoggingOut(true);
-            try {
-              await clearCredentials();
-              router.replace("/(auth)");
-            } catch (error) {
-              console.error("[ProfileScreen] Failed to logout:", error);
-            } finally {
-              setIsLoggingOut(false);
-            }
+    // If in web, use window.confirm, else Alert.alert
+    const isWeb = typeof window !== 'undefined';
+    const confirmLogout = isWeb ? window.confirm('Вы уверены, что хотите выйти из аккаунта?') : null;
+    if ((isWeb && !confirmLogout)) {
+      // User cancelled in web
+      return;
+    }
+    if (!isWeb) {
+      Alert.alert(
+        "Выход из аккаунта",
+        "Вы уверены, что хотите выйти из аккаунта?",
+        [
+          {
+            text: "Отмена",
+            style: "cancel",
+            onPress: () => {},
           },
-        },
-      ]
-    );
+          {
+            text: "Выйти",
+            style: "destructive",
+            onPress: async () => {
+              await doLogout();
+            },
+          },
+        ]
+      );
+      return;
+    }
+    // For web, just proceed if confirmed
+    await doLogout();
+  };
+
+  const doLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      chatStore.disconnectAll();
+      chatStore.clearUserCache && chatStore.clearUserCache();
+      await clearCredentials();
+      await new Promise(resolve => setTimeout(resolve, 200));
+      router.replace("/(auth)");
+    } catch (error) {
+      console.error("[ProfileScreen] Failed to logout:", error);
+      if (typeof window === 'undefined') {
+        Alert.alert("Ошибка", "Не удалось выйти из аккаунта. Попробуйте еще раз.");
+      } else {
+        window.alert("Не удалось выйти из аккаунта. Попробуйте еще раз.");
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
