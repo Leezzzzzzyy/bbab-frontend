@@ -1,50 +1,65 @@
-# Welcome to your Expo app 👋
+# Messenger frontend - Amber
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Фронтенд для мессенджера, реализованное на базе Expo/React Native с использованием TypeScript. Интерфейс ориентирован на мобильные платформы и web (через `react-native-web`).
 
-## Get started
+## Стек
 
-1. Install dependencies
+- React Native (Expo)
+- React 19, TypeScript
+- Expo Router для маршрутизации
+- Библиотеки: `react-native-gesture-handler`, `react-native-reanimated`, `expo-image`, `expo-image-picker` и другие, перечислённые в `package.json`.
 
-   ```bash
-   npm install
-   ```
+## Ключевые возможности
 
-2. Start the app
+- Аутентификация пользователя
+- Список чатов и окно сообщений
+- Загрузка и отображение изображений (аватар, вложения)
+- Поддержка Android, iOS (через Expo) и веб-браузера
 
-   ```bash
-   npx expo start
-   ```
+## Как запустить для разработки
 
-In the output, you'll find options to open the app in a
+1. Установите Node.js и менеджер пакетов (npm или yarn).
+2. Установите зависимости:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+3. Запуск в режиме разработки (Metro/Expo):
 
-## Learn more
+```powershell
+npm run start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+4. Открыть в мобильном эмуляторе или в Expo Go на устройстве:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```powershell
+npm run android     # запустить в Android-эмуляторе / устройстве
+npm run ios         # запустить в iOS-симуляторе (macOS)
+npm run web         # запустить в браузере
+```
 
-## Join the community
+## Полезные скрипты
 
-Join our community of developers creating universal apps.
+- `npm run reset-project` — специальный скрипт для сброса локальных артефактов проекта.
+- `npm run lint` — запуск ESLint.
+- `npm run typecheck` — проверка типов TypeScript.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Публикация и деплой
+
+В репозитории есть скрипт `deploy.sh`, который содержит процесс публикации/деплоя. На Windows его можно запускать в среде Bash (Git Bash, WSL) или на CI:
+
+```bash
+./deploy.sh
+```
+
+Альтернативно можно использовать инструменты Expo для публикации (например, `expo publish`) в зависимости от выбранного процесса сборки и релиза.
+
+## Ссылка на бэкенд
+
+Бэкенд проекта доступен по адресу: https://github.com/tush00nka/bbbab_messenger
+
+## Авторы
+
+- [@thatusualguy](https://github.com/thatusualguy)
+- [@Leezzzzzzyy](https://github.com/Leezzzzzzyy)
