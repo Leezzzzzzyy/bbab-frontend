@@ -1,6 +1,6 @@
+import { WS_BASE_URL } from "@/config/environment";
 import { AppState } from "react-native";
 import { chatAPI, userAPI, type User } from "./api";
-import { WS_BASE_URL } from "@/config/environment";
 
 export type Message = {
     id: number;
@@ -230,23 +230,42 @@ class ChatStore {
         // Prevent multiple concurrent connection attempts
         const currentState = this.connectionStates.get(dialogId);
         const existing = this.activeConnections.get(dialogId);
-        if (existing && existing.readyState === WebSocket.OPEN) {
+        
+        // Если уже подключены и соединение открыто - не переподключаемся
+        if (existing && existing.readyState === WebSocket.OPEN && currentState === "connected") {
             console.log(`Already connected to chat ${dialogId}, skip reconnect`);
             return;
         }
+        
+        // Если уже идет процесс подключения - не создаем новое
         if (currentState === "connecting") {
             console.log(`Already connecting to chat ${dialogId}, skipping duplicate request`);
             return;
         }
 
-        // Close existing connection if any
-        if (existing && existing.readyState !== WebSocket.CLOSED) {
-            try {
-                // Mark as intentional disconnection before closing existing connection
-                this.intentionallyDisconnected.add(dialogId);
-                existing.close();
-            } catch (e) {
-                console.log(`Failed to close existing connection for chat ${dialogId}:`, e);
+        // Close existing connection if any (только если оно не открыто или не в процессе подключения)
+        if (existing) {
+            const readyState = existing.readyState;
+            if (readyState === WebSocket.OPEN || readyState === WebSocket.CONNECTING) {
+                // Если соединение открыто или в процессе подключения, закрываем его перед созданием нового
+                try {
+                    // Mark as intentional disconnection before closing existing connection
+                    this.intentionallyDisconnected.add(dialogId);
+                    existing.close();
+                    // Удаляем из активных соединений сразу
+                    this.activeConnections.delete(dialogId);
+                } catch (e) {
+                    console.log(`Failed to close existing connection for chat ${dialogId}:`, e);
+                }
+            } else if (readyState !== WebSocket.CLOSED) {
+                // Для других состояний (CLOSING) тоже закрываем
+                try {
+                    this.intentionallyDisconnected.add(dialogId);
+                    existing.close();
+                    this.activeConnections.delete(dialogId);
+                } catch (e) {
+                    console.log(`Failed to close existing connection for chat ${dialogId}:`, e);
+                }
             }
         }
 
@@ -278,8 +297,11 @@ class ChatStore {
             const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                // Only proceed if we're still in connecting state
-                if (this.connectionStates.get(dialogId) === "connecting") {
+                // Проверяем, что это все еще наше соединение и мы в состоянии подключения
+                const currentState = this.connectionStates.get(dialogId);
+                const currentConnection = this.activeConnections.get(dialogId);
+                
+                if (currentState === "connecting" && currentConnection === ws) {
                     console.log(`WebSocket connected to chat ${dialogId}`);
                     this.connectionStates.set(dialogId, "connected");
                     emitter.emit(`chat:status:${dialogId}`, "connected");
@@ -289,8 +311,14 @@ class ChatStore {
                     const pendingTimer = this.reconnectTimers.get(dialogId);
                     if (pendingTimer) {
                         clearTimeout(pendingTimer);
-                        this.reconnectTimers.delete(dialogId);
+                        this.reconnectTimers.delete(pendingTimer);
                     }
+                    // Убеждаемся, что флаг intentional disconnection снят
+                    this.intentionallyDisconnected.delete(dialogId);
+                } else {
+                    // Это старое соединение, которое уже не нужно - закрываем его
+                    console.log(`WebSocket opened but connection state changed, closing old connection for chat ${dialogId}`);
+                    ws.close();
                 }
             };
 
@@ -316,6 +344,14 @@ class ChatStore {
             };
 
             ws.onclose = (event) => {
+                // Проверяем, что это закрытие относится к текущему соединению
+                const currentConnection = this.activeConnections.get(dialogId);
+                if (currentConnection !== ws) {
+                    // Это старое соединение, игнорируем его закрытие
+                    console.log(`Ignoring close event for old connection of chat ${dialogId}`);
+                    return;
+                }
+
                 // Check if this was an intentional disconnection
                 const wasIntentional = this.intentionallyDisconnected.has(dialogId);
 
@@ -355,10 +391,12 @@ class ChatStore {
             this.scheduleReconnect(dialogId, token);
             };
 
+            // Сохраняем соединение сразу, но проверяем его актуальность в обработчиках
             this.activeConnections.set(dialogId, ws);
         } catch (error) {
             console.error(`Failed to create WebSocket for chat ${dialogId}:`, error);
             this.connectionStates.set(dialogId, "disconnected");
+            this.activeConnections.delete(dialogId);
             emitter.emit(`chat:status:${dialogId}`, "error");
             // Schedule reconnect on error
             this.scheduleReconnect(dialogId, token);
@@ -503,12 +541,18 @@ class ChatStore {
                     const msgData = data.message as any;
                     console.debug(`WebSocket new message for chat ${dialogId}:`, msgData);
                     // Server uses uppercase field names (ID, not id)
+                    const timestamp = new Date(msgData.Timestamp || msgData.timestamp).getTime();
+                    const updatedAtRaw = msgData.UpdatedAt ? new Date(msgData.UpdatedAt).getTime() : undefined;
+                    // Устанавливаем updatedAt только если он действительно отличается от timestamp (сообщение было отредактировано)
+                    const updatedAt = updatedAtRaw && updatedAtRaw > timestamp ? updatedAtRaw : undefined;
                     const msg: Message = {
                         id: msgData.ID || msgData.id || 0,
                         dialogId: msgData.chat_id || dialogId,
                         senderId: msgData.sender_id,
                         text: msgData.message,
-                        timestamp: new Date(msgData.Timestamp || msgData.timestamp).getTime(),
+                        timestamp: timestamp,
+                        updatedAt: updatedAt,
+                        isDeleted: msgData.IsDeleted || false,
                     };
                     console.log(`Parsed message: id=${msg.id}, sender=${msg.senderId}, text="${msg.text.substring(0, 50)}..."`);
                     if (msg.id > 0) {
@@ -525,24 +569,43 @@ class ChatStore {
             case "history": {
                 // Message history on initial connection
                 if (data.messages && Array.isArray(data.messages)) {
-                    const messages = data.messages
-                        .map((msg: any) => {
-                            if (!msg.ID) return null;
-                            return {
-                                id: msg.ID,
-                                dialogId: msg.chat_id || dialogId,
-                                senderId: msg.sender_id,
-                                text: msg.message,
-                                timestamp: new Date(msg.Timestamp || msg.CreatedAt).getTime(),
-                            };
-                        })
-                        .filter((msg): msg is Message => msg !== null);
+                    const messages: Message[] = [];
+                    for (const msg of data.messages) {
+                        if (!msg.ID) continue;
+                        const timestamp = new Date(msg.Timestamp || msg.CreatedAt).getTime();
+                        const updatedAtRaw = msg.UpdatedAt ? new Date(msg.UpdatedAt).getTime() : undefined;
+                        // Устанавливаем updatedAt только если он действительно отличается от timestamp (сообщение было отредактировано)
+                        const updatedAt = updatedAtRaw && updatedAtRaw > timestamp ? updatedAtRaw : undefined;
+                        messages.push({
+                            id: msg.ID,
+                            dialogId: msg.chat_id || dialogId,
+                            senderId: msg.sender_id,
+                            text: msg.message,
+                            timestamp: timestamp,
+                            updatedAt: updatedAt,
+                            isDeleted: msg.IsDeleted || false,
+                        });
+                    }
 
-                    // Merge history with existing, де-дуп по id
+                    // Merge history with existing, всегда обновляем сообщения из истории
                     const existing = this.messagesByDialog.get(dialogId) ?? [];
                     const byId = new Map<number, Message>();
+                    
+                    // Сначала добавляем существующие сообщения
                     for (const m of existing) byId.set(m.id, m);
-                    for (const m of messages) byId.set(m.id, m);
+                    
+                    // Затем обновляем/добавляем сообщения из истории
+                    // Сообщения из истории имеют приоритет, так как они свежие с сервера
+                    for (const m of messages) {
+                        const existingMsg = byId.get(m.id);
+                        if (existingMsg) {
+                            // Обновляем существующее сообщение данными из истории
+                            // Это гарантирует, что последнее сообщение всегда будет актуальным
+                            Object.assign(existingMsg, m);
+                        } else {
+                            byId.set(m.id, m);
+                        }
+                    }
 
                     const merged = Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
 
@@ -619,12 +682,24 @@ class ChatStore {
         // Check if message already exists
         const exists = arr.find((m) => m.id === msg.id);
         if (exists) {
-            // if timestamps differ, keep the latest payload
-            if (msg.timestamp > exists.timestamp) {
+            // Проверяем, нужно ли обновить сообщение
+            // Обновляем если:
+            // 1. timestamp изменился (новое сообщение)
+            // 2. updatedAt изменился (сообщение было отредактировано)
+            // 3. текст изменился (сообщение было изменено)
+            // 4. статус удаления изменился
+            const shouldUpdate = 
+                msg.timestamp > exists.timestamp ||
+                (msg.updatedAt && (!exists.updatedAt || msg.updatedAt > exists.updatedAt)) ||
+                msg.text !== exists.text ||
+                msg.isDeleted !== exists.isDeleted;
+            
+            if (shouldUpdate) {
                 Object.assign(exists, msg);
                 this.messagesByDialog.set(dialogId, [...arr].sort((a, b) => a.timestamp - b.timestamp));
                 emitter.emit<Message>(`msg:${dialogId}`, exists);
                 this.recalcDialogSummaries();
+                console.log(`Updated message ${msg.id} in chat ${dialogId}`);
             } else {
                 console.log(`Message ${msg.id} already exists in chat ${dialogId}, skipping duplicate`);
             }
@@ -749,6 +824,7 @@ class ChatStore {
             // Return unknown user on error
             return {
                 id: userId,
+                ID: userId,
                 username: "Неизвестно",
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -810,6 +886,55 @@ class ChatStore {
         this.connectionStates.clear();
 
         console.log("Disconnected from all chats");
+    }
+
+    /**
+     * Check and update last message for a dialog
+     * This ensures the last message is always up-to-date
+     */
+    async checkLastMessage(dialogId: number, token: string): Promise<void> {
+        if (!dialogId || !token) return;
+
+        try {
+            // Получаем последние сообщения через API (направление older без курсора = последние сообщения)
+            const response = await chatAPI.getChatMessages(dialogId, token, undefined, 1, "older");
+            
+            if (response.data && response.data.length > 0) {
+                // Первое сообщение в ответе - это самое последнее (при direction="older" они отсортированы от новых к старым)
+                const apiMessage = response.data[0];
+                const timestamp = new Date(apiMessage.createdAt || (apiMessage as any).CreatedAt).getTime();
+                const updatedAtRaw = apiMessage.updatedAt ? new Date(apiMessage.updatedAt).getTime() : undefined;
+                // Устанавливаем updatedAt только если он действительно отличается от timestamp (сообщение было отредактировано)
+                const updatedAt = updatedAtRaw && updatedAtRaw > timestamp ? updatedAtRaw : undefined;
+                const msg: Message = {
+                    id: apiMessage.id || (apiMessage as any).ID || 0,
+                    dialogId: dialogId,
+                    senderId: (apiMessage as any).sender_id || (apiMessage as any).senderID || 0,
+                    text: apiMessage.message || "",
+                    timestamp: timestamp,
+                    updatedAt: updatedAt,
+                    isDeleted: (apiMessage as any).deletedAt ? true : false,
+                };
+
+                if (msg.id > 0) {
+                    // Получаем текущее последнее сообщение для сравнения
+                    const currentMessages = this.messagesByDialog.get(dialogId) ?? [];
+                    const currentLastMessage = currentMessages[currentMessages.length - 1];
+                    
+                    // Используем addMessage для правильной обработки обновления
+                    // addMessage проверит, нужно ли обновить сообщение, и обновит его если нужно
+                    this.addMessage(dialogId, msg);
+                    
+                    // Если это новое сообщение или изменилось последнее сообщение, обновляем сводки диалогов
+                    if (!currentLastMessage || currentLastMessage.id !== msg.id || currentLastMessage.text !== msg.text) {
+                        this.recalcDialogSummaries();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to check last message for chat ${dialogId}:`, error);
+            // Не выбрасываем ошибку, чтобы не прерывать работу приложения
+        }
     }
 }
 

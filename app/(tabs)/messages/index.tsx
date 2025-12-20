@@ -33,7 +33,28 @@ export default function MessagesIndex() {
     useEffect(() => {
         loadDialogs();
         const off = chatStore.subscribeDialogs((d) => setDialogs(d.slice()));
-        return () => off();
+        
+        // Периодически проверяем последние сообщения для всех диалогов
+        // чтобы обновлять список диалогов реактивно, даже если нет активных WebSocket соединений
+        const checkAllDialogsInterval = setInterval(() => {
+            if (credentials?.token) {
+                // Получаем актуальный список диалогов на момент проверки
+                const currentDialogs = chatStore.listDialogs();
+                if (currentDialogs.length > 0) {
+                    // Проверяем последнее сообщение для каждого диалога
+                    currentDialogs.forEach((dialog) => {
+                        chatStore.checkLastMessage(dialog.id, credentials.token).catch((error) => {
+                            console.error(`Failed to check last message for dialog ${dialog.id}:`, error);
+                        });
+                    });
+                }
+            }
+        }, 5000); // Проверяем каждые 5 секунд
+        
+        return () => {
+            off();
+            clearInterval(checkAllDialogsInterval);
+        };
     }, [credentials?.token, loadDialogs]);
 
     useFocusEffect(

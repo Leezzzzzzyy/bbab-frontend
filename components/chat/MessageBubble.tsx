@@ -208,7 +208,7 @@ export default function MessageBubble({
                                 }}
                             >
                                 {timeDisplay}
-                                {message.updatedAt && " (edited)"}
+                                {message.updatedAt && message.updatedAt > message.timestamp && " (edited)"}
                             </Text>
                             {/* Read receipts indicator */}
                             {isMe && message.readBy && message.readBy.length > 0 && (

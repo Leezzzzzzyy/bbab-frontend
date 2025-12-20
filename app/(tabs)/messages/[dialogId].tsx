@@ -127,14 +127,25 @@ export default function ChatScreen() {
             setConnectionStatus(status as ConnectionStatusType);
         });
 
+        // Периодическая проверка последнего сообщения для обновления изменений
+        // Проверяем каждые 10 секунд, чтобы последнее сообщение всегда было актуальным
+        const checkLastMessageInterval = setInterval(() => {
+            if (credentials?.token && connectionStatus === "connected") {
+                chatStore.checkLastMessage(dialogIdNum, credentials.token).catch((error) => {
+                    console.error("Failed to check last message:", error);
+                });
+            }
+        }, 10000); // 10 секунд
+
         // Cleanup on unmount or dialogId change
         return () => {
             offMessages();
             offHistory();
             offStatus();
+            clearInterval(checkLastMessageInterval);
             chatStore.disconnectChat(dialogIdNum);
         };
-    }, [dialogIdNum, credentials?.token]);
+    }, [dialogIdNum, credentials?.token]); // Убрали connectionStatus из зависимостей, чтобы избежать циклов переподключения
 
     const onSend = useCallback(
         (text: string) => {
