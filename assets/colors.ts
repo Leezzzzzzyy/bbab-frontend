@@ -9,4 +9,5 @@ export default {
   additionalText: "#ffe9d1",
   additionalWhite: "#fff4e5",
   error: "#ff5353",
+  border: "#333333",
 };

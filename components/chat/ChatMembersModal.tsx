@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import colors from "@/assets/colors";
 import { chatAPI, type User } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface ChatMembersModalProps {
     visible: boolean;
@@ -118,23 +119,37 @@ export default function ChatMembersModal({
     const [members, setMembers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { credentials } = useAuth();
 
     const loadMembers = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const users = await chatAPI.getChatUsers(dialogId);
+            console.log("🔍 ChatMembersModal.loadMembers: dialogId=", dialogId, "token=", credentials?.token ? "exists" : "missing");
+
+            if (!credentials?.token) {
+                console.log("❌ ChatMembersModal.loadMembers: No token");
+                setError("Нет авторизации");
+                return;
+            }
+
+            console.log("📡 Fetching chat users for dialogId:", dialogId);
+            const users = await chatAPI.getChatUsers(dialogId, credentials.token);
+            console.log("✅ Received users:", users);
+
             setMembers(users || []);
         } catch (err) {
-            console.error("Failed to load chat members:", err);
+            console.error("❌ Failed to load chat members:", err);
             setError("Не удалось загрузить участников");
         } finally {
             setLoading(false);
         }
-    }, [dialogId]);
+    }, [dialogId, credentials?.token]);
 
     useEffect(() => {
+        console.log("🔔 ChatMembersModal.useEffect: visible=", visible, "dialogId=", dialogId);
         if (visible && dialogId) {
+            console.log("🔔 ChatMembersModal.useEffect: Calling loadMembers");
             loadMembers();
         }
     }, [visible, dialogId, loadMembers]);

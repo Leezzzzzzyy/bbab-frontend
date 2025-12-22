@@ -42,10 +42,11 @@ export interface User {
     Username?: string | null;
     password?: string;
     phone?: string | null;
-    createdAt?: string | null;
-    updatedAt?: string | null;
-    deletedAt?: string | null;
-    chats?: Chat[];
+    CreatedAt?: string | null;
+    UpdatedAt?: string | null;
+    DeletedAt?: string | null;
+    display_name?: string | null;
+    Chats?: Chat[];
 }
 
 export interface Chat {
@@ -110,6 +111,39 @@ export interface PaginationInfo {
     totalCount: number;
 }
 
+export interface ChatDetailResponse {
+    createdAt: string;
+    deletedAt?: {
+        time: string;
+        valid: boolean;
+    } | null;
+    id: number;
+    isGroup: boolean;
+    messages?: Array<{
+        attachment_url?: string;
+        chat_id: number;
+        createdAt: string;
+        deletedAt?: {
+            time: string;
+            valid: boolean;
+        } | null;
+        id: number;
+        is_edited: boolean;
+        message: string;
+        reply_to?: string;
+        reply_to_id?: number;
+        sender: User;
+        sender_id: number;
+        status?: string;
+        timestamp: string;
+        type: string;
+        updatedAt: string;
+    }>;
+    name: string;
+    updatedAt: string;
+    Users: User[];
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -141,7 +175,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
         (apiError as any).status = response.status;
         throw apiError;
     }
-    return response.json();
+    const data = await response.json();
+    console.log("[API] Response received, status:", response.status, "data:", data);
+    return data;
 }
 
 function getAuthHeader(token?: string): HeadersInit {
@@ -303,25 +339,35 @@ export const chatAPI = {
     },
 
     /**
-     * GET /chat/{id}/users
-     * Get users of chat
+     * GET /chat/{id}
+     * Get users of chat by retrieving full chat details
      */
-    getChatUsers: async (chatId: number): Promise<User[]> => {
-        const response = await fetch(`${API_BASE_URL}/chat/${chatId}/users`, {
+    getChatUsers: async (chatId: number, token: string): Promise<User[]> => {
+        const url = `${API_BASE_URL}/chat/${chatId}`;
+        console.log(`📡 getChatUsers: Fetching from ${url}`);
+        const response = await fetch(url, {
             method: "GET",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
-        return handleResponse(response);
+        console.log(`📡 getChatUsers: Response status ${response.status}`);
+        const chatData: ChatDetailResponse = await handleResponse(response);
+        console.log(`📡 getChatUsers: Chat data keys:`, Object.keys(chatData));
+        console.log(`📡 getChatUsers: Chat data.users:`, chatData.Users);
+        console.log(`📡 getChatUsers: Chat data.users type:`, typeof chatData.Users);
+        console.log(`📡 getChatUsers: Chat data.users is array:`, Array.isArray(chatData.Users));
+        const users = chatData.Users || [];
+        console.log(`📡 getChatUsers: Extracted ${users.length} users`, users);
+        return users;
     },
 
     /**
      * POST /chat/{id}/add
      * Add user to chat
      */
-    addUserToChat: async (chatId: number, data: AddUserRequest): Promise<{ status: string }> => {
+    addUserToChat: async (chatId: number, data: AddUserRequest, token: string): Promise<{ status: string }> => {
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}/add`, {
             method: "POST",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
             body: JSON.stringify(data),
         });
         return handleResponse(response);
@@ -365,9 +411,9 @@ export const chatAPI = {
 
     /**
      * GET /chat/{id}
-     * Retrieve all messages from a chat by its ID
+     * Retrieve full chat details including messages and users by its ID
      */
-    getChat: async (chatId: number, token: string): Promise<Message[]> => {
+    getChat: async (chatId: number, token: string): Promise<ChatDetailResponse> => {
         const response = await fetch(`${API_BASE_URL}/chat/${chatId}`, {
             method: "GET",
             headers: getAuthHeader(token),
@@ -379,10 +425,10 @@ export const chatAPI = {
      * POST /chat/join/{chat_id}/{user_id}
      * Mark user as joined in chat (cache, Redis)
      */
-    joinChat: async (chatId: number, userId: number): Promise<{ status: string }> => {
+    joinChat: async (chatId: number, userId: number, token: string): Promise<{ status: string }> => {
         const response = await fetch(`${API_BASE_URL}/chat/join/${chatId}/${userId}`, {
             method: "POST",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },
@@ -391,10 +437,10 @@ export const chatAPI = {
      * POST /chat/leave/{chat_id}/{user_id}
      * Mark user as left in chat (persist and clear if last user)
      */
-    leaveChat: async (chatId: number, userId: number): Promise<{ status: string }> => {
+    leaveChat: async (chatId: number, userId: number, token: string): Promise<{ status: string }> => {
         const response = await fetch(`${API_BASE_URL}/chat/leave/${chatId}/${userId}`, {
             method: "POST",
-            headers: getAuthHeader(),
+            headers: getAuthHeader(token),
         });
         return handleResponse(response);
     },

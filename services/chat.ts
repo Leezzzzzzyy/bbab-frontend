@@ -383,7 +383,7 @@ class ChatStore {
             if (isAuthError) {
                 console.warn(`[ChatStore] WebSocket auth error for chat ${dialogId}, code: ${closeCode}, reason: ${closeReason}`);
                 // Эмитируем событие для глобального обработчика
-                emitter.emit("auth:unauthorized");
+                emitter.emit("auth:unauthorized", { dialogId, closeCode, closeReason });
             }
 
             const shouldStop =
