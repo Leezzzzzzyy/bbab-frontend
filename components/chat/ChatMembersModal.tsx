@@ -162,13 +162,17 @@ export default function ChatMembersModal({
 
     const renderMember = ({ item }: { item: User }) => {
         const displayName = getDisplayName(item) ?? "Неизвестно";
+        console.log(displayName);
+        const memberId = (item.ID ?? item.id) as number | undefined;
+        const isMe = !!(credentials?.userId && memberId && credentials.userId === memberId);
+        const displayLabel = isMe ? `${displayName} (Вы)` : displayName;
         return (
             <View style={styles.memberItem}>
                 <View style={styles.memberAvatar}>
                     <Text style={styles.memberAvatarText}>{getInitials(displayName)}</Text>
                 </View>
                 <View style={styles.memberInfo}>
-                    <Text style={styles.memberName}>{displayName}</Text>
+                    <Text style={styles.memberName}>{displayLabel}</Text>
                     {item.phone && (
                         <Text style={styles.memberUsername}>{item.phone}</Text>
                     )}
@@ -225,4 +229,3 @@ export default function ChatMembersModal({
         </Modal>
     );
 }
-

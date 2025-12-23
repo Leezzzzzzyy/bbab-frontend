@@ -61,14 +61,27 @@ export interface User {
  */
 export function getDisplayName(user: Partial<User> | any): string | null {
     if (!user) return null;
-    return (
-        user.display_name ??
-        user.DisplayName ??
-        user.displayName ??
-        user.Username ??
-        user.username ??
-        null
-    );
+
+    const candidates = [
+        user.display_name,
+        user.DisplayName,
+        user.displayName,
+        user.Username,
+        user.username,
+    ];
+
+    for (const v of candidates) {
+        if (v == null) continue; // null or undefined
+        if (typeof v === "string") {
+            const t = v.trim();
+            if (t.length > 0) return t;
+            continue;
+        }
+        // If it's not a string but present, return its string representation
+        return String(v);
+    }
+
+    return null;
 }
 
 export interface Chat {
