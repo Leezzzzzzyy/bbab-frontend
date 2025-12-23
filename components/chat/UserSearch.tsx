@@ -20,6 +20,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Avatar from "@/components/Avatar";
 
 interface UserSearchProps {
     onClose?: () => void;
@@ -131,11 +132,7 @@ export default function UserSearch({onClose}: UserSearchProps) {
                     onPress={() => handleUserSelect(item)}
                 >
                     <View style={styles.userInfo}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>
-                                {(getDisplayName(item) ?? item.username ?? item.phone)?.[0]?.toUpperCase() || "?"}
-                            </Text>
-                        </View>
+                        <Avatar user={item} size={48} style={{ marginRight: 12 }} />
                         <View style={styles.userDetails}>
                             <Text style={styles.username}>{getDisplayName(item) ?? item.username}</Text>
                             {item.phone && (
@@ -257,20 +254,6 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         flex: 1,
-    },
-    avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.main,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 12,
-    },
-    avatarText: {
-        color: "#1e1e1e",
-        fontSize: 18,
-        fontWeight: "700",
     },
     userDetails: {
         flex: 1,

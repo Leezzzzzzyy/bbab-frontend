@@ -14,6 +14,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Avatar from "@/components/Avatar";
 
 // Маппинг ответа API в ваш интерфейс User
 function mapApiUserToUser(apiUser: any): User {
@@ -28,6 +29,9 @@ function mapApiUserToUser(apiUser: any): User {
     DeletedAt: apiUser.DeletedAt ?? apiUser.deletedAt ?? null,
     Chats: apiUser.Chats ?? apiUser.chats ?? [],
     display_name: apiUser.display_name ?? apiUser.DisplayName ?? apiUser.displayName ?? apiUser.Username ?? apiUser.username ?? null,
+    // Map avatar fields from API if present
+    profile_picture_key: apiUser.profile_picture_key ?? apiUser.ProfilePictureKey ?? apiUser.profilePictureKey ?? null,
+    profilePictureURL: apiUser.profilePictureURL ?? apiUser.profile_picture_url ?? apiUser.avatar_url ?? null,
   } as User;
 }
 
@@ -218,15 +222,7 @@ export default function ProfileScreen() {
               marginBottom: 16,
             }}
           >
-            <Text
-              style={{
-                color: "#1e1e1e",
-                fontWeight: "900",
-                fontSize: 32,
-              }}
-            >
-              {getInitials(getDisplayName(user) ?? user.username)}
-            </Text>
+            <Avatar user={user} size={96} />
           </View>
 
           <Text

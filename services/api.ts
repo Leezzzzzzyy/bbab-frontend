@@ -53,6 +53,7 @@ export interface User {
     deletedAt?: string | null;
     Chats?: Chat[];
     chats?: Chat[];
+    profile_picture_key?: string | null;
 }
 
 /**
@@ -305,6 +306,40 @@ export const authAPI = {
 // User Endpoints
 // ============================================================================
 
+// Add simple in-memory avatar cache to avoid repeated requests
+const avatarCache: Map<number, string | null> = new Map();
+
+// Add helper for fetching avatar URL for a user. Returns null when user has no avatar (404) or on error.
+async function fetchAvatarUrl(userId: number): Promise<string | null> {
+    try {
+        // The backend exposes GET /user/{id}/avatar which returns { profilePictureURL: string } or 404
+        const url = `${API_BASE_URL}/user/${userId}/avatar`;
+        const response = await fetch(url, { method: "GET", headers: { "Content-Type": "application/json" } });
+        if (response.status === 404) {
+            // No avatar for this user
+            avatarCache.set(userId, null);
+            return null;
+        }
+        if (!response.ok) {
+            console.warn("[userAPI.getAvatarUrl] Unexpected response", response.status, await response.text().catch(() => ""));
+            avatarCache.set(userId, null);
+            return null;
+        }
+        const data = await response.json().catch(() => null);
+        const maybeUrl = data && (data.profilePictureURL ?? data.profile_picture_url ?? data.url ?? null);
+        if (typeof maybeUrl === "string" && maybeUrl.length > 0) {
+            avatarCache.set(userId, maybeUrl);
+            return maybeUrl;
+        }
+        avatarCache.set(userId, null);
+        return null;
+    } catch (err) {
+        console.warn("[userAPI.getAvatarUrl] Failed to fetch avatar:", err);
+        avatarCache.set(userId, null);
+        return null;
+    }
+}
+
 export const userAPI = {
     /**
      * GET /user/me
@@ -341,6 +376,16 @@ export const userAPI = {
         });
         return handleResponse(response);
     },
+
+    // New: get avatar URL for a user (uses internal cache). Returns null if no avatar.
+    getAvatarUrl: async (userId: number): Promise<string | null> => {
+        if (!userId) return null;
+        if (avatarCache.has(userId)) return avatarCache.get(userId) as string | null;
+        return fetchAvatarUrl(userId);
+    },
+
+    // Expose cache for other parts of the app to inspect/clear if needed
+    _avatarCache: avatarCache,
 };
 
 // ============================================================================

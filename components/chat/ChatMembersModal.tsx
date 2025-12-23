@@ -11,6 +11,7 @@ import {
 import colors from "@/assets/colors";
 import { chatAPI, type User, getDisplayName } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
+import Avatar from "@/components/Avatar";
 
 interface ChatMembersModalProps {
     visible: boolean;
@@ -168,9 +169,7 @@ export default function ChatMembersModal({
         const displayLabel = isMe ? `${displayName} (Вы)` : displayName;
         return (
             <View style={styles.memberItem}>
-                <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{getInitials(displayName)}</Text>
-                </View>
+                <Avatar user={item} size={40} style={{ marginRight: 12 }} />
                 <View style={styles.memberInfo}>
                     <Text style={styles.memberName}>{displayLabel}</Text>
                     {item.phone && (

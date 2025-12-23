@@ -2,9 +2,12 @@ import colors from "@/assets/colors";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import { Alert, Image, StyleSheet, TouchableOpacity } from "react-native";
+import Avatar from "@/components/Avatar";
+import { useAuth } from "@/context/AuthContext";
 
 const AvatarPicker = () => {
   const [image, setImage] = useState<string | null>(null);
+  const { credentials } = useAuth();
 
   const requestPermissions = async () => {
     const { status: galleryStatus } =
@@ -71,10 +74,15 @@ const AvatarPicker = () => {
       {image ? (
         <Image source={{ uri: image }} style={styles.avatarImage} />
       ) : (
-        <Image
-          source={require("@/assets/images/AvatarPick.png")}
-          style={styles.placeholderImage}
-        />
+        // If user is logged in, try to display their remote avatar via Avatar component
+        credentials?.userId ? (
+          <Avatar userId={credentials.userId} size={100} />
+        ) : (
+          <Image
+            source={require("@/assets/images/AvatarPick.png")}
+            style={styles.placeholderImage}
+          />
+        )
       )}
     </TouchableOpacity>
   );
