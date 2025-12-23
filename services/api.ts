@@ -36,17 +36,39 @@ export interface TokenResponse {
 }
 
 export interface User {
-    id: number;
-    ID: number;
+    id?: number;
+    ID?: number;
     username?: string | null;
     Username?: string | null;
+    display_name?: string | null;
+    displayName?: string | null;
+    DisplayName?: string | null;
     password?: string;
     phone?: string | null;
     CreatedAt?: string | null;
     UpdatedAt?: string | null;
     DeletedAt?: string | null;
-    display_name?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    deletedAt?: string | null;
     Chats?: Chat[];
+    chats?: Chat[];
+}
+
+/**
+ * Helper: return the best display name for a user.
+ * Preference order: display_name, DisplayName, Username, username
+ */
+export function getDisplayName(user: Partial<User> | any): string | null {
+    if (!user) return null;
+    return (
+        user.display_name ??
+        user.DisplayName ??
+        user.displayName ??
+        user.Username ??
+        user.username ??
+        null
+    );
 }
 
 export interface Chat {

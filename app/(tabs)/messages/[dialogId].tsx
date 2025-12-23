@@ -4,6 +4,7 @@ import MessageInput from "@/components/chat/MessageInput";
 import ConnectionStatus, { type ConnectionStatusType } from "@/components/chat/ConnectionStatus";
 import ChatMembersModal from "@/components/chat/ChatMembersModal";
 import {chatStore, type Message} from "@/services/chat";
+import { getDisplayName } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -219,7 +220,7 @@ export default function ChatScreen() {
                                     chatStore.getUser(item.senderId).then((user) => {
                                         setSenderNames((prev) => ({
                                             ...prev,
-                                            [item.senderId]: user.Username || "Неизвестно",
+                                            [item.senderId]: getDisplayName(user) ?? user.Username ?? "Неизвестно",
                                         }));
                                     });
                                 }

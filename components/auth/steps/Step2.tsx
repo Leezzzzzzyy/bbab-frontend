@@ -2,6 +2,7 @@ import colors from "@/assets/colors";
 import { useAuth } from "@/context";
 import { usePhone } from "@/context/PhoneContext";
 import { authAPI, chatStore, userAPI } from "@/services";
+import { getDisplayName } from "@/services/api";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -93,7 +94,7 @@ export const Step2: React.FC<{ onNext: () => void; onBack: () => void }> = ({
       // Save credentials to storage
       await setCredentials({
         token: response.token,
-        username: currentUser.username ?? currentUser.Username ?? "",
+        username: getDisplayName(currentUser) ?? currentUser.username ?? currentUser.Username ?? "",
         userId: (currentUser as any)?.id ?? (currentUser as any)?.ID,
         phone: `+7${phoneNumber}`,
       });

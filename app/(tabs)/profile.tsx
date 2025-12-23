@@ -1,6 +1,6 @@
 import colors from "@/assets/colors";
 import { useAuth } from "@/context/AuthContext";
-import { userAPI, type User } from "@/services/api";
+import { userAPI, type User, getDisplayName } from "@/services/api";
 import { chatStore } from "@/services/chat";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
@@ -18,16 +18,17 @@ import {
 // Маппинг ответа API в ваш интерфейс User
 function mapApiUserToUser(apiUser: any): User {
   return {
-    id: apiUser.ID,
-    ID: apiUser.ID,
-    username: apiUser.Username ?? null,
+    id: apiUser.ID ?? apiUser.id,
+    ID: apiUser.ID ?? apiUser.id,
+    username: apiUser.Username ?? apiUser.username ?? null,
     password: apiUser.Password,
-    phone: apiUser.Phone ?? null,
-    createdAt: apiUser.CreatedAt ?? null,
-    updatedAt: apiUser.UpdatedAt ?? null,
-    deletedAt: apiUser.DeletedAt ?? null,
-    chats: apiUser.Chats ?? [],
-  };
+    phone: apiUser.Phone ?? apiUser.phone ?? null,
+    CreatedAt: apiUser.CreatedAt ?? apiUser.createdAt ?? null,
+    UpdatedAt: apiUser.UpdatedAt ?? apiUser.updatedAt ?? null,
+    DeletedAt: apiUser.DeletedAt ?? apiUser.deletedAt ?? null,
+    Chats: apiUser.Chats ?? apiUser.chats ?? [],
+    display_name: apiUser.display_name ?? apiUser.DisplayName ?? apiUser.displayName ?? apiUser.Username ?? apiUser.username ?? null,
+  } as User;
 }
 
 export default function ProfileScreen() {
@@ -126,13 +127,13 @@ export default function ProfileScreen() {
     }
   };
 
-  const getInitials = (username: string | undefined | null) => {
-    if (!username) return "?";
-    const parts = username.trim().split(" ");
+  const getInitials = (name: string | undefined | null) => {
+    if (!name) return "?";
+    const parts = name.trim().split(" ");
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return username[0].toUpperCase();
+    return name[0].toUpperCase();
   };
 
   if (isLoading) {
@@ -224,7 +225,7 @@ export default function ProfileScreen() {
                 fontSize: 32,
               }}
             >
-              {getInitials(user.username)}
+              {getInitials(getDisplayName(user) ?? user.username)}
             </Text>
           </View>
 
@@ -236,7 +237,7 @@ export default function ProfileScreen() {
               marginBottom: 8,
             }}
           >
-            {user.username}
+            {getDisplayName(user) ?? user.username}
           </Text>
 
           {user.phone && (
@@ -323,7 +324,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            {user.createdAt && (
+            {user.CreatedAt && (
               <View
                 style={{
                   flexDirection: "row",
@@ -360,7 +361,7 @@ export default function ProfileScreen() {
                     fontWeight: "600",
                   }}
                 >
-                  {formatDate(user.createdAt)}
+                  {formatDate(user.CreatedAt)}
                 </Text>
               </View>
             )}

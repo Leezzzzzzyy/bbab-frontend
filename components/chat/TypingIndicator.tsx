@@ -2,13 +2,14 @@ import colors from "@/assets/colors";
 import React from "react";
 import { View, Text } from "react-native";
 import type { TypingUser } from "@/services/chat";
+import { getDisplayName } from "@/services/api";
 
 export default function TypingIndicator({ typingUsers }: { typingUsers: TypingUser[] }) {
     if (!typingUsers || typingUsers.length === 0) {
         return null;
     }
 
-    const names = typingUsers.map((u) => u.username).join(", ");
+    const names = typingUsers.map((u) => getDisplayName(u) ?? u.username ?? "?").join(", ");
     const isPlural = typingUsers.length > 1;
 
     return (
@@ -48,4 +49,3 @@ export default function TypingIndicator({ typingUsers }: { typingUsers: TypingUs
         </View>
     );
 }
-

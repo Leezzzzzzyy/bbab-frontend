@@ -9,7 +9,7 @@ import {
     StyleSheet,
 } from "react-native";
 import colors from "@/assets/colors";
-import { chatAPI, type User } from "@/services/api";
+import { chatAPI, type User, getDisplayName } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface ChatMembersModalProps {
@@ -161,11 +161,11 @@ export default function ChatMembersModal({
     };
 
     const renderMember = ({ item }: { item: User }) => {
-        const displayName = item.Username || "Неизвестно";
+        const displayName = getDisplayName(item) ?? "Неизвестно";
         return (
             <View style={styles.memberItem}>
                 <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{getInitials(item.Username)}</Text>
+                    <Text style={styles.memberAvatarText}>{getInitials(displayName)}</Text>
                 </View>
                 <View style={styles.memberInfo}>
                     <Text style={styles.memberName}>{displayName}</Text>

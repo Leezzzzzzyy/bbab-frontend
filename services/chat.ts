@@ -15,7 +15,8 @@ export type Message = {
 
 export type TypingUser = {
     userId: number;
-    username: string;
+    username?: string;
+    display_name?: string | null;
     isTyping: boolean;
 };
 
@@ -36,6 +37,9 @@ type WSMessage = {
     message_id?: number;
     user_id?: number;
     username?: string;
+    Username?: string;
+    DisplayName?: string;
+    display_name?: string;
     chat_id?: number;
     meta?: any;
 };
@@ -650,12 +654,16 @@ class ChatStore {
                     if (isTyping) {
                         // Add or update typing user
                         const existingIndex = typingUsers.findIndex(u => u.userId === data.user_id);
+                        const displayNameFromPayload = (data as any).display_name ?? (data as any).DisplayName ?? (data as any).username ?? (data as any).Username ?? null;
                         if (existingIndex >= 0) {
                             typingUsers[existingIndex].isTyping = true;
+                            typingUsers[existingIndex].display_name = displayNameFromPayload;
+                            typingUsers[existingIndex].username = (data as any).username ?? typingUsers[existingIndex].username;
                         } else {
                             typingUsers.push({
                                 userId: data.user_id,
-                                username: data.username || `User ${data.user_id}`,
+                                username: (data as any).username || undefined,
+                                display_name: displayNameFromPayload,
                                 isTyping: true,
                             });
                         }
@@ -841,9 +849,10 @@ class ChatStore {
                 id: userId,
                 ID: userId,
                 username: "Неизвестно",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
+                display_name: "Неизвестно",
+                CreatedAt: new Date().toISOString(),
+                UpdatedAt: new Date().toISOString(),
+            } as User;
         }
     }
 

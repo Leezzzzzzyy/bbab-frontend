@@ -5,7 +5,7 @@
 
 import colors from "@/assets/colors";
 import { useAuth } from "@/context/AuthContext";
-import { chatAPI, userAPI, type User } from "@/services/api";
+import { chatAPI, userAPI, type User, getDisplayName } from "@/services/api";
 import { chatStore } from "@/services/chat";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
@@ -58,17 +58,20 @@ export default function UserSearch({onClose}: UserSearchProps) {
                     const raw = user as any; // временно отключаем TS для приведения
                     return {
                         id: raw.id ?? raw.ID,
+                        ID: raw.ID ?? raw.id,
                         username: raw.username ?? raw.Username ?? null,
+                        Username: raw.Username ?? raw.username ?? null,
                         password: raw.password ?? raw.Password ?? "",
                         phone: raw.phone ?? raw.Phone ?? null,
-                        createdAt: raw.createdAt ?? raw.CreatedAt ?? null,
-                        updatedAt: raw.updatedAt ?? raw.UpdatedAt ?? null,
-                        deletedAt: raw.deletedAt ?? raw.DeletedAt ?? null,
-                        chats: raw.chats ?? raw.Chats ?? [],
-                    };
+                        CreatedAt: raw.CreatedAt ?? raw.createdAt ?? null,
+                        UpdatedAt: raw.UpdatedAt ?? raw.updatedAt ?? null,
+                        DeletedAt: raw.DeletedAt ?? raw.deletedAt ?? null,
+                        display_name: raw.display_name ?? raw.DisplayName ?? raw.displayName ?? raw.Username ?? raw.username ?? null,
+                        Chats: raw.Chats ?? raw.chats ?? [],
+                    } as User;
                 });
 
-                setUsers(normalized.filter(u => u.id != null));
+                setUsers(normalized.filter(u => u.id != null) as unknown as User[]);
             } catch (error) {
                 console.error("[UserSearch] Failed to search users:", error);
                 setUsers([]);
@@ -130,11 +133,11 @@ export default function UserSearch({onClose}: UserSearchProps) {
                     <View style={styles.userInfo}>
                         <View style={styles.avatar}>
                             <Text style={styles.avatarText}>
-                                {item.username?.[0]?.toUpperCase() || "?"}
+                                {(getDisplayName(item) ?? item.username ?? item.phone)?.[0]?.toUpperCase() || "?"}
                             </Text>
                         </View>
                         <View style={styles.userDetails}>
-                            <Text style={styles.username}>{item.username}</Text>
+                            <Text style={styles.username}>{getDisplayName(item) ?? item.username}</Text>
                             {item.phone && (
                                 <Text style={styles.phone}>{item.phone}</Text>
                             )}
@@ -304,4 +307,3 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 });
-
