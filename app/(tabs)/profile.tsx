@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import Avatar from "@/components/Avatar";
+import AvatarPicker from "@/components/auth/AvatarPicker";
 
 // Маппинг ответа API в ваш интерфейс User
 function mapApiUserToUser(apiUser: any): User {
@@ -131,15 +132,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const getInitials = (name: string | undefined | null) => {
-    if (!name) return "?";
-    const parts = name.trim().split(" ");
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name[0].toUpperCase();
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -222,7 +214,22 @@ export default function ProfileScreen() {
               marginBottom: 16,
             }}
           >
-            <Avatar user={user} size={96} />
+            {/* If this is the current user, allow picking; otherwise just show avatar */}
+            {credentials?.userId && user.id === credentials.userId ? (
+              <AvatarPicker
+                size={96}
+                onUploaded={(url) => {
+                  // update local user object and avatar cache
+                  setUser((prev) => (prev ? { ...prev, profilePictureURL: url ?? prev.profilePictureURL } : prev));
+                  if (user?.id) {
+                    if (url) userAPI._avatarCache.set(user.id as number, url);
+                    else userAPI._avatarCache.delete(user.id as number);
+                  }
+                }}
+              />
+            ) : (
+              <Avatar user={user} size={96} />
+            )}
           </View>
 
           <Text

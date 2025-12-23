@@ -377,6 +377,87 @@ export const userAPI = {
         return handleResponse(response);
     },
 
+    // New: upload avatar for a user (supports web + native)
+    uploadAvatar: async (userId: number, fileInput: string | File | Blob | { uri: string; name?: string; type?: string }, token: string): Promise<string | null> => {
+        if (!userId) throw new Error("userId is required");
+        const url = `${API_BASE_URL}/user/${userId}/avatar`;
+        const formData = new FormData();
+
+        // If running in a browser and fileInput is a File/Blob, append directly
+        if (typeof window !== "undefined" && (fileInput instanceof File || fileInput instanceof Blob)) {
+            const file = fileInput as File | Blob;
+            // If it's a plain Blob, wrap into File for filename support
+            if (file instanceof File) {
+                formData.append("avatar", file);
+            } else {
+                const f = new File([file], "avatar.jpg", { type: (file as Blob).type || "image/jpeg" });
+                formData.append("avatar", f);
+            }
+        } else if (typeof fileInput === "string") {
+            // fileInput is a URI string
+            if (typeof window !== "undefined") {
+                // Web: convert remote URI to Blob then File
+                const resp = await fetch(fileInput);
+                const blob = await resp.blob();
+                const filename = (fileInput.split("/").pop() || "avatar.jpg").split("?")[0];
+                const f = new File([blob], filename, { type: blob.type || "image/jpeg" });
+                formData.append("avatar", f);
+            } else {
+                // React Native: append { uri, name, type }
+                const uri = fileInput as string;
+                const name = uri.split("/").pop() || "avatar.jpg";
+                const match = /\.(\w+)(?:\?|$)/.exec(name);
+                const ext = match ? match[1].toLowerCase() : "jpg";
+                let type = "image/jpeg";
+                if (ext === "png") type = "image/png";
+                // @ts-ignore - React Native FormData accepts an object with uri
+                formData.append("avatar", { uri, name, type });
+            }
+        } else if (typeof fileInput === "object" && (fileInput as any).uri) {
+            // Native-style object with uri/name/type
+            const fi = fileInput as { uri: string; name?: string; type?: string };
+            const name = fi.name || fi.uri.split("/").pop() || "avatar.jpg";
+            const type = fi.type || (name.endsWith(".png") ? "image/png" : "image/jpeg");
+            // @ts-ignore
+            formData.append("avatar", { uri: fi.uri, name, type });
+        } else {
+            throw new Error("Unsupported file input for uploadAvatar");
+        }
+
+        const headers: HeadersInit = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        // IMPORTANT: Do not set Content-Type; fetch will set the correct multipart boundary
+        const response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: formData as any,
+        });
+
+        if (!response.ok) {
+            // Try to parse error body
+            const text = await response.text().catch(() => "");
+            const msg = text || `HTTP ${response.status}: ${response.statusText}`;
+            const err = new Error(msg);
+            (err as any).status = response.status;
+            throw err;
+        }
+
+        const data = await response.json().catch(() => null);
+        const maybeUrl = data && (data.profilePictureURL ?? data.profile_picture_url ?? data.url ?? null);
+        if (maybeUrl && typeof maybeUrl === "string") {
+            avatarCache.set(userId, maybeUrl);
+            return maybeUrl;
+        }
+        // If server doesn't return URL, attempt to refresh cache by hitting GET /user/{id}/avatar
+        try {
+            const refreshed = await fetchAvatarUrl(userId);
+            return refreshed;
+        } catch (e) {
+            return null;
+        }
+    },
+
     // New: get avatar URL for a user (uses internal cache). Returns null if no avatar.
     getAvatarUrl: async (userId: number): Promise<string | null> => {
         if (!userId) return null;
