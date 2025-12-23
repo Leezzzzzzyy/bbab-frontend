@@ -1,7 +1,7 @@
 import colors from "@/assets/colors";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Keyboard, Pressable, TextInput, View } from "react-native";
+import { Keyboard, Pressable, TextInput, View, Platform } from "react-native";
 
 export default function MessageInput({
     onSend,
@@ -17,10 +17,14 @@ export default function MessageInput({
     const [text, setText] = useState("");
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isTypingRef = useRef(false);
+    // ref на TextInput чтобы можно было вернуть фокус
+    const inputRef = useRef<TextInput | null>(null);
 
     const handleTextChange = useCallback(
         (newText: string) => {
             setText(newText);
+            // Передаём изменение текста наружу, если нужно
+            onTextChange?.(newText);
             if (onTyping) {
                 const isTyping = newText.trim().length > 0;
                 if (isTyping && !isTypingRef.current) {
@@ -40,7 +44,7 @@ export default function MessageInput({
                 }, 2000);
             }
         },
-        [onTyping]
+        [onTyping, onTextChange]
     );
 
     const submit = useCallback(() => {
@@ -49,7 +53,13 @@ export default function MessageInput({
         if (!value) return;
         onSend(value);
         setText("");
-        Keyboard.dismiss();
+        // Для web возвращаем фокус в инпут; на нативе старое поведение — скрыть клавиатуру
+        if (Platform.OS === 'web') {
+            // Небольшая задержка помогает в web-платформе, чтобы фокус точно сработал после очистки
+            setTimeout(() => inputRef.current?.focus(), 0);
+        } else {
+            Keyboard.dismiss();
+        }
         // Stop typing indicator
         if (onTyping && isTypingRef.current) {
             isTypingRef.current = false;
@@ -61,14 +71,20 @@ export default function MessageInput({
         }
     }, [onSend, onTyping, text, disabled]);
 
-    // const handleTextChange = useCallback(
-    //     (value: string) => {
-    //         if (disabled) return;
-    //         setText(value);
-    //         onTextChange?.(value);
-    //     },
-    //     [onTextChange, disabled]
-    // );
+    // Обработчик клавиш для web: Enter отправляет, Shift+Enter — новая строка
+    const handleKeyPress = useCallback((e: any) => {
+        try {
+            const key = e?.nativeEvent?.key;
+            const shift = e?.nativeEvent?.shiftKey;
+            if (key === "Enter" && !shift) {
+                // Попробуем предотвратить стандартное поведение (если доступно)
+                if (typeof e.preventDefault === "function") e.preventDefault();
+                submit();
+            }
+        } catch {
+            // тихо игнорируем
+        }
+    }, [submit]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -96,11 +112,15 @@ export default function MessageInput({
             }}
         >
             <TextInput
+                ref={inputRef}
                 placeholder="Сообщение"
                 placeholderTextColor={colors.additionalText}
                 value={text}
                 onChangeText={handleTextChange}
+                // onSubmitEditing по-прежнему работает для нативных платформ
                 onSubmitEditing={submit}
+                // На web используем onKeyPress для перехвата Enter (чтобы отличить Shift+Enter)
+                {...(Platform.OS === 'web' ? { onKeyPress: handleKeyPress } : {})}
                 multiline
                 editable={!disabled}
                 style={{
