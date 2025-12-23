@@ -13,6 +13,7 @@ import {
   ScrollView,
   Text,
   View,
+  TextInput,
 } from "react-native";
 import Avatar from "@/components/Avatar";
 import AvatarPicker from "@/components/auth/AvatarPicker";
@@ -34,6 +35,168 @@ function mapApiUserToUser(apiUser: any): User {
     profile_picture_key: apiUser.profile_picture_key ?? apiUser.ProfilePictureKey ?? apiUser.profilePictureKey ?? null,
     profilePictureURL: apiUser.profilePictureURL ?? apiUser.profile_picture_url ?? apiUser.avatar_url ?? null,
   } as User;
+}
+
+// Вспомогательный компонент для редактирования display_name
+function EditableDisplayName({
+  user,
+  credentials,
+  onUpdate,
+}: {
+  user: User;
+  credentials: any;
+  onUpdate: (u: User) => void;
+}) {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [value, setValue] = React.useState<string>(user.display_name ?? "");
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  useEffect(() => {
+    setValue(user.display_name ?? "");
+  }, [user.display_name, user.username]);
+
+  const displayToShow = (valueToShow?: string | null) => {
+    const v = valueToShow ?? user.display_name ?? null;
+    const dn = getDisplayName({ display_name: v, username: user.username });
+    return dn ?? user.username ?? "";
+  };
+
+  const handleSave = async () => {
+    if (!credentials?.token) {
+      if (typeof window === "undefined") {
+        Alert.alert("Ошибка", "Отсутствует токен авторизации");
+      } else {
+        window.alert("Отсутствует токен авторизации");
+      }
+      return;
+    }
+    if (!user?.id) {
+      if (typeof window === "undefined") {
+        Alert.alert("Ошибка", "Неизвестный пользователь");
+      } else {
+        window.alert("Неизвестный пользователь");
+      }
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Отправляем только display_name, остальные поля пустые строки как по спецификации
+      const body = {
+        display_name: value,
+        password: "",
+        phone: "",
+        profile_picture_key: "",
+        username: "",
+      };
+      await userAPI.updateUser(user.id as number, body, credentials.token);
+      // После успешного обновления рефрешим профиль через API
+      const apiuserData = await userAPI.getCurrentUser(credentials.token);
+      const refreshed = mapApiUserToUser(apiuserData);
+      onUpdate(refreshed);
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error("[EditableDisplayName] update failed:", err);
+      const msg = err?.message ?? "Не удалось сохранить";
+      if (typeof window === "undefined") {
+        Alert.alert("Ошибка", msg);
+      } else {
+        window.alert(msg);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setValue(user.display_name ?? "");
+    setIsEditing(false);
+  };
+
+  return (
+    <View style={{ width: "100%", alignItems: "center" }}>
+      {!isEditing ? (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text
+            style={{
+              color: colors.maintext,
+              fontSize: 22,
+              fontWeight: "700",
+            }}
+          >
+            {displayToShow(user.display_name)}
+          </Text>
+          {/* Edit button visible only for current user */}
+          {credentials?.userId && user.id === credentials.userId && (
+            <Pressable
+              onPress={() => setIsEditing(true)}
+              style={{ marginLeft: 8 }}
+            >
+              <Ionicons name="pencil-outline" size={20} color={colors.main} />
+            </Pressable>
+          )}
+        </View>
+      ) : (
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <TextInput
+            value={value}
+            onChangeText={setValue}
+            placeholder={user.username ?? "Имя пользователя"}
+            style={{
+              width: "100%",
+              backgroundColor: colors.background,
+              borderColor: colors.main,
+              borderWidth: 1,
+              padding: 8,
+              borderRadius: 8,
+              color: colors.maintext,
+              fontSize: 16,
+            }}
+            editable={!isSaving}
+          />
+
+          <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
+            <Pressable
+              onPress={handleSave}
+              disabled={isSaving}
+              style={{
+                backgroundColor: colors.main,
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 8,
+                opacity: isSaving ? 0.6 : 1,
+              }}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={{ color: "#fff", fontWeight: "600" }}>Сохранить</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={handleCancel}
+              disabled={isSaving}
+              style={{
+                backgroundColor: colors.background,
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.additionalText,
+              }}
+            >
+              <Text style={{ color: colors.additionalText, fontWeight: "600" }}>Отменить</Text>
+            </Pressable>
+          </View>
+
+          <Text style={{ color: colors.additionalText, marginTop: 8, fontSize: 12 }}>
+            Пустое значение будет отображать username
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function ProfileScreen() {
@@ -220,7 +383,10 @@ export default function ProfileScreen() {
                 size={96}
                 onUploaded={(url) => {
                   // update local user object and avatar cache
-                  setUser((prev) => (prev ? { ...prev, profilePictureURL: url ?? prev.profilePictureURL } : prev));
+                  setUser((prev) => {
+                    if (!prev) return prev;
+                    return { ...prev, profilePictureURL: url ?? prev.profilePictureURL } as User;
+                  });
                   if (user?.id) {
                     if (url) userAPI._avatarCache.set(user.id as number, url);
                     else userAPI._avatarCache.delete(user.id as number);
@@ -232,142 +398,121 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <Text
-            style={{
-              color: colors.maintext,
-              fontSize: 22,
-              fontWeight: "700",
-              marginBottom: 8,
-            }}
-          >
-            {getDisplayName(user) ?? user.username}
-          </Text>
+          <EditableDisplayName
+            user={user}
+            credentials={credentials}
+            onUpdate={setUser}
+          />
 
-          {user.phone && (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 4,
-              }}
-            >
-              <Ionicons
-                name="call-outline"
-                size={16}
-                color={colors.additionalText}
-              />
-              <Text
-                style={{
-                  color: colors.additionalText,
-                  fontSize: 16,
-                  marginLeft: 6,
-                }}
-              >
-                {user.phone}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Info Section */}
-        <View
-          style={{
-            width: "100%",
-            backgroundColor: colors.backgroundAccent,
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 24,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.maintext,
-              fontSize: 18,
-              fontWeight: "700",
-              marginBottom: 16,
-            }}
-          >
-            Информация
-          </Text>
-
-          <View style={{ gap: 16 }}>
+          {/* User Info */}
+          <View style={{ width: "100%", marginTop: 16 }}>
+            {/* ID */}
             <View
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
-                alignItems: "center",
+                marginBottom: 12,
               }}
             >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-              >
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={colors.additionalText}
-                />
-                <Text
-                  style={{
-                    color: colors.additionalText,
-                    fontSize: 14,
-                    marginLeft: 8,
-                  }}
-                >
-                  ID пользователя
-                </Text>
-              </View>
               <Text
                 style={{
                   color: colors.maintext,
-                  fontSize: 14,
-                  fontWeight: "600",
+                  fontSize: 16,
+                  fontWeight: "500",
+                }}
+              >
+                ID пользователя
+              </Text>
+              <Text
+                style={{
+                  color: colors.additionalText,
+                  fontSize: 16,
+                  fontWeight: "500",
                 }}
               >
                 #{user.id}
               </Text>
             </View>
 
-            {user.CreatedAt && (
-              <View
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
                 style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
+                  color: colors.maintext,
+                  fontSize: 16,
+                  fontWeight: "500",
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flex: 1,
-                  }}
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={20}
-                    color={colors.additionalText}
-                  />
-                  <Text
-                    style={{
-                      color: colors.additionalText,
-                      fontSize: 14,
-                      marginLeft: 8,
-                    }}
-                  >
-                    Дата регистрации
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    color: colors.maintext,
-                    fontSize: 14,
-                    fontWeight: "600",
-                  }}
-                >
-                  {formatDate(user.CreatedAt)}
-                </Text>
-              </View>
-            )}
+                Имя пользователя
+              </Text>
+              <Text
+                style={{
+                  color: colors.additionalText,
+                  fontSize: 16,
+                  fontWeight: "500",
+                }}
+              >
+                {user.username}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.maintext,
+                  fontSize: 16,
+                  fontWeight: "500",
+                }}
+              >
+                Телефон
+              </Text>
+              <Text
+                style={{
+                  color: colors.additionalText,
+                  fontSize: 16,
+                  fontWeight: "500",
+                }}
+              >
+                {user.phone ?? "Не указан"}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.maintext,
+                  fontSize: 16,
+                }}
+              >
+                Дата регистрации
+              </Text>
+              <Text
+                style={{
+                  color: colors.maintext,
+                  fontSize: 16,
+                  fontWeight: "500",
+                }}
+              >
+                {user.CreatedAt ? formatDate(user.CreatedAt) : "-"}
+              </Text>
+            </View>
           </View>
         </View>
 

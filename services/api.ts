@@ -54,6 +54,7 @@ export interface User {
     Chats?: Chat[];
     chats?: Chat[];
     profile_picture_key?: string | null;
+    profilePictureURL?: string | null;
 }
 
 /**
@@ -375,6 +376,41 @@ export const userAPI = {
             headers: getAuthHeader(),
         });
         return handleResponse(response);
+    },
+
+    // Update user information via PUT /user/{id}
+    updateUser: async (
+        userId: number,
+        data: {
+            display_name?: string;
+            password?: string;
+            phone?: string;
+            profile_picture_key?: string;
+            username?: string;
+        },
+        token?: string
+    ): Promise<void> => {
+        if (!userId) throw new Error("userId is required");
+        const url = `${API_BASE_URL}/user/${userId}`;
+        const headers: HeadersInit = getAuthHeader(token);
+        const response = await fetch(url, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(data),
+        });
+
+        // If server returns empty 200 (no JSON body), don't try to parse it.
+        if (!response.ok) {
+            // Try to parse error body if present
+            const text = await response.text().catch(() => "");
+            const msg = text || `HTTP ${response.status}: ${response.statusText}`;
+            const err = new Error(msg);
+            (err as any).status = response.status;
+            throw err;
+        }
+
+        // Success (200/204) with empty body: just return
+        return;
     },
 
     // New: upload avatar for a user (supports web + native)
