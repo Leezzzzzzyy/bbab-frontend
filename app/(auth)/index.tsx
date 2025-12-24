@@ -2,7 +2,7 @@ import colors from "@/assets/colors";
 import { useAppFonts } from "@/assets/fonts/useFonts";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Image, Linking, Text, TouchableOpacity, View } from "react-native";
 
 export default function AuthIndex() {
   const { fontsLoadded: _ } = useAppFonts();
@@ -72,6 +72,24 @@ export default function AuthIndex() {
           style={{
             marginTop: 20,
           }}
+          onPress={() => {
+            const botUsername = 'amber_login_bot'; 
+            const telegramUrl = `tg://resolve?domain=${botUsername}`;
+            const webUrl = `https://t.me/${botUsername}`;
+            
+            // Пытаемся открыть в приложении Telegram
+            Linking.canOpenURL(telegramUrl).then(supported => {
+              if (supported) {
+                return Linking.openURL(telegramUrl);
+              } else {
+                // Если приложение Telegram не установлено, открываем в браузере
+                return Linking.openURL(webUrl);
+              }
+            }).catch(err => {
+              console.log('Error opening Telegram:', err);
+            });
+          }}
+          activeOpacity={0.7}
         >
           <Text
             style={{
@@ -80,7 +98,7 @@ export default function AuthIndex() {
               fontSize: 16,
             }}
           >
-            Continue in English
+            Ссылка на Telegram Бота для получения кодов
           </Text>
         </TouchableOpacity>
       </View>
