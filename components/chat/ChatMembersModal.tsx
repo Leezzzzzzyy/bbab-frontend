@@ -8,12 +8,15 @@ import {
     ActivityIndicator,
     StyleSheet,
     Alert,
+    Platform,
 } from "react-native";
 import colors from "@/assets/colors";
 import { chatAPI, type User, getDisplayName } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import Avatar from "@/components/Avatar";
 import UserSearch from "@/components/chat/UserSearch";
+import { useNavigation } from "expo-router";
+import { chatStore } from "@/services/chat";
 
 interface ChatMembersModalProps {
     visible: boolean;
@@ -111,6 +114,15 @@ const styles = StyleSheet.create({
         textAlign: "center",
         paddingVertical: 16,
     },
+    removeButton: {
+        padding: 8,
+        marginLeft: 8,
+    },
+    removeButtonText: {
+        fontSize: 20,
+        color: colors.error || "#ff4444",
+        fontWeight: "600",
+    },
 });
 
 export default function ChatMembersModal({
@@ -124,7 +136,8 @@ export default function ChatMembersModal({
     const [error, setError] = useState<string | null>(null);
     const { credentials } = useAuth();
     const [isInviteVisible, setIsInviteVisible] = useState(false);
-    const [isInviting, setIsInviting] = useState(false);
+    const [removingIds, setRemovingIds] = useState<number[]>([]);
+    const nav = useNavigation();
 
     const loadMembers = useCallback(async () => {
         try {
@@ -160,7 +173,6 @@ export default function ChatMembersModal({
         if (!userId) return;
 
         try {
-            setIsInviting(true);
             // Use joinChat API to notify that user joined the chat (per requested endpoint)
             await chatAPI.joinChat(dialogId, userId, credentials.token);
 
@@ -175,7 +187,7 @@ export default function ChatMembersModal({
             const msg = err?.message ?? "Не удалось пригласить пользователя";
             Alert.alert("Ошибка", msg);
         } finally {
-            setIsInviting(false);
+            // no-op
         }
     }, [credentials?.token, dialogId, loadMembers]);
 
@@ -187,19 +199,104 @@ export default function ChatMembersModal({
         }
     }, [visible, dialogId, loadMembers]);
 
+    const handleRemove = useCallback((memberId?: number) => {
+        if (!memberId) return;
+
+        const doRemove = async () => {
+            if (!credentials?.token) {
+                Alert.alert("Ошибка", "Нет токена аутентификации");
+                return;
+            }
+
+            // Prevent duplicate removal
+            if (removingIds.includes(memberId)) return;
+
+            setRemovingIds((prev) => [...prev, memberId]);
+            console.log("🔔 ChatMembersModal.doRemove: starting removal", { dialogId, memberId, tokenExists: !!credentials?.token });
+            try {
+                console.log("🔔 ChatMembersModal.doRemove: calling chatAPI.leaveChat", { dialogId, memberId });
+                await chatAPI.leaveChat(dialogId, memberId, credentials.token);
+                console.log("🔔 ChatMembersModal.doRemove: leaveChat resolved for", memberId);
+
+                // After successful removal, refresh members from API
+                await loadMembers();
+
+                // If the current user removed themselves, close modal and navigate away
+                if (credentials.userId && credentials.userId === memberId) {
+                    try {
+                        // disconnect websocket for this chat
+                        chatStore.disconnectChat(dialogId);
+                    } catch (e) {
+                        console.warn("chatStore.disconnectChat failed:", e);
+                    }
+
+                    onClose();
+                    try {
+                        // navigate to messages list
+                        // @ts-ignore
+                        nav.replace && nav.replace("/messages");
+                    } catch (e) {
+                        console.warn("Navigation replace failed:", e);
+                        // fallback: goBack
+                        try { nav.goBack && nav.goBack(); } catch (ee) { console.warn(ee); }
+                    }
+                }
+            } catch (err: any) {
+                console.error("Failed to remove member:", err);
+                const msg = err?.message ?? "Не удалось удалить участника";
+                Alert.alert("Ошибка", msg);
+            } finally {
+                setRemovingIds((prev) => prev.filter((id) => id !== memberId));
+            }
+        };
+
+        // Confirm
+        const confirmMessage = "Вы уверены, что хотите удалить участника из чата?";
+        if (Platform.OS === "web" || (typeof window !== "undefined" && typeof window.confirm === "function")) {
+            if (window.confirm(confirmMessage)) {
+                doRemove();
+            }
+        } else {
+            Alert.alert(
+                "Подтвердите",
+                confirmMessage,
+                [
+                    { text: "Отмена", style: "cancel" },
+                    { text: "Удалить", style: "destructive", onPress: doRemove },
+                ]
+            );
+        }
+    }, [credentials?.token, credentials?.userId, dialogId, loadMembers, nav, onClose, removingIds]);
+
     const renderMember = ({ item }: { item: User }) => {
         const displayName = getDisplayName(item) ?? "Неизвестно";
         console.log(displayName);
         const memberId = (item.ID ?? item.id) as number | undefined;
         const isMe = !!(credentials?.userId && memberId && credentials.userId === memberId);
         const displayLabel = isMe ? `${displayName} (Вы)` : displayName;
+        const isRemoving = memberId ? removingIds.includes(memberId) : false;
         return (
-            <View style={styles.memberItem}>
-                <Avatar user={item} size={40} style={{ marginRight: 12 }} />
-                <View style={styles.memberInfo}>
-                    <Text style={styles.memberName}>{displayLabel}</Text>
-                    {item.phone && (
-                        <Text style={styles.memberUsername}>{item.phone}</Text>
+            <View style={[styles.memberItem, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Avatar user={item} size={40} style={{ marginRight: 12 }} />
+                    <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{displayLabel}</Text>
+                        {item.phone && (
+                            <Text style={styles.memberUsername}>{item.phone}</Text>
+                        )}
+                    </View>
+                </View>
+
+                <View style={{ marginLeft: 8 }}>
+                    {isRemoving ? (
+                        <ActivityIndicator size="small" color={colors.error || "#ff4444"} />
+                    ) : (
+                        <TouchableOpacity
+                            onPress={() => handleRemove(memberId)}
+                            style={styles.removeButton}
+                        >
+                            <Text style={styles.removeButtonText}>×</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
             </View>
@@ -251,7 +348,7 @@ export default function ChatMembersModal({
                     ) : (
                         <FlatList
                             data={members}
-                            keyExtractor={(item) => `member-${item.id}`}
+                            keyExtractor={(item) => `member-${item.id ?? item.ID}`}
                             renderItem={renderMember}
                             scrollEnabled={true}
                             nestedScrollEnabled={true}
