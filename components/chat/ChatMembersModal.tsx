@@ -7,11 +7,13 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     StyleSheet,
+    Alert,
 } from "react-native";
 import colors from "@/assets/colors";
 import { chatAPI, type User, getDisplayName } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import Avatar from "@/components/Avatar";
+import UserSearch from "@/components/chat/UserSearch";
 
 interface ChatMembersModalProps {
     visible: boolean;
@@ -121,6 +123,8 @@ export default function ChatMembersModal({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { credentials } = useAuth();
+    const [isInviteVisible, setIsInviteVisible] = useState(false);
+    const [isInviting, setIsInviting] = useState(false);
 
     const loadMembers = useCallback(async () => {
         try {
@@ -139,13 +143,41 @@ export default function ChatMembersModal({
             console.log("✅ Received users:", users);
 
             setMembers(users || []);
-        } catch (err) {
+        } catch (err: any) {
             console.error("❌ Failed to load chat members:", err);
             setError("Не удалось загрузить участников");
         } finally {
             setLoading(false);
         }
     }, [dialogId, credentials?.token]);
+
+    const handleInvite = useCallback(async (user: User) => {
+        if (!credentials?.token) {
+            Alert.alert("Ошибка", "Нет токена аутентификации");
+            return;
+        }
+        const userId = (user.ID ?? user.id) as number | undefined;
+        if (!userId) return;
+
+        try {
+            setIsInviting(true);
+            // Use joinChat API to notify that user joined the chat (per requested endpoint)
+            await chatAPI.joinChat(dialogId, userId, credentials.token);
+
+            // Refresh members list
+            await loadMembers();
+
+            // Close invite modal
+            setIsInviteVisible(false);
+        } catch (err: any) {
+            console.error("Failed to invite user:", err);
+            // Show API error message if available
+            const msg = err?.message ?? "Не удалось пригласить пользователя";
+            Alert.alert("Ошибка", msg);
+        } finally {
+            setIsInviting(false);
+        }
+    }, [credentials?.token, dialogId, loadMembers]);
 
     useEffect(() => {
         console.log("🔔 ChatMembersModal.useEffect: visible=", visible, "dialogId=", dialogId);
@@ -154,12 +186,6 @@ export default function ChatMembersModal({
             loadMembers();
         }
     }, [visible, dialogId, loadMembers]);
-
-    const getInitials = (username?: string | null): string => {
-        if (!username) return "?";
-        const parts = username.split(" ");
-        return parts.map((p) => p[0]).join("").toUpperCase().slice(0, 2);
-    };
 
     const renderMember = ({ item }: { item: User }) => {
         const displayName = getDisplayName(item) ?? "Неизвестно";
@@ -191,14 +217,22 @@ export default function ChatMembersModal({
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <Text style={styles.title}>
-                            Участники ({members.length})
+                            {dialogName ? `${dialogName} — Участники (${members.length})` : `Участники (${members.length})`}
                         </Text>
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={onClose}
-                        >
-                            <Text style={styles.closeButtonText}>×</Text>
-                        </TouchableOpacity>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                            <TouchableOpacity
+                                style={[styles.closeButton, {marginRight: 8}]}
+                                onPress={() => setIsInviteVisible(true)}
+                            >
+                                <Text style={[styles.closeButtonText, {fontSize: 22}]}>＋</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={onClose}
+                            >
+                                <Text style={styles.closeButtonText}>×</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {loading ? (
@@ -225,6 +259,35 @@ export default function ChatMembersModal({
                     )}
                 </View>
             </View>
+            {/* Invite modal uses the existing UserSearch component */}
+            <Modal
+                visible={isInviteVisible}
+                animationType="slide"
+                onRequestClose={() => setIsInviteVisible(false)}
+            >
+                <View style={{flex: 1, backgroundColor: colors.background}}>
+                    <View style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border,
+                    }}>
+                        <Text style={{color: colors.text, fontSize: 18, fontWeight: '600'}}>Пригласить в чат</Text>
+                        <TouchableOpacity onPress={() => setIsInviteVisible(false)} style={{padding: 8}}>
+                            <Text style={{color: colors.text, fontSize: 20}}>×</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <UserSearch
+                        onClose={() => setIsInviteVisible(false)}
+                        excludeIds={members.map(m => (m.ID ?? m.id) as number).filter(Boolean)}
+                        onUserSelect={async (user) => {
+                            await handleInvite(user);
+                        }}
+                    />
+                </View>
+            </Modal>
         </Modal>
     );
 }

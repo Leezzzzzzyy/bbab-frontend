@@ -24,9 +24,11 @@ import Avatar from "@/components/Avatar";
 
 interface UserSearchProps {
     onClose?: () => void;
+    onUserSelect?: (user: User) => Promise<void> | void;
+    excludeIds?: number[];
 }
 
-export default function UserSearch({onClose}: UserSearchProps) {
+export default function UserSearch({onClose, onUserSelect, excludeIds}: UserSearchProps) {
     const {credentials} = useAuth();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
@@ -88,16 +90,23 @@ export default function UserSearch({onClose}: UserSearchProps) {
         };
     }, [searchQuery, credentials?.token]);
 
-    const handleUserSelect = useCallback(
+    const handleSelect = useCallback(
         async (user: User) => {
             if (!credentials?.token || !credentials?.userId || !user?.id) return;
 
-            try {
-                // Читаемое имя чата: "Вы и Пользователь" или запасные варианты
-                const chatName =
-                    `${credentials.username ?? "Вы"} и ${user.username ?? user.phone ?? "пользователь"}`.trim();
+            // If parent provided a custom onUserSelect (invite mode), delegate to it
+            if (onUserSelect) {
+                try {
+                    await onUserSelect(user);
+                } catch (err) {
+                    console.error("[UserSearch] onUserSelect failed:", err);
+                }
+                return;
+            }
 
-                // Создаём чат с обоими участниками (бек всё равно добавит инициатора, но передаем явно)
+            // Default behavior: create a direct chat with the selected user
+            try {
+                const chatName = `${credentials.username ?? "Вы"} и ${user.username ?? user.phone ?? "пользователь"}`.trim();
                 const resultChat = await chatAPI.createChat(
                     {
                         name: chatName,
@@ -106,13 +115,8 @@ export default function UserSearch({onClose}: UserSearchProps) {
                     credentials.token
                 );
 
-                // Обновляем список диалогов локально
                 await chatStore.loadDialogs(credentials.token);
-
-                // Закрываем модалку перед навигацией
                 onClose?.();
-
-                // Навигация к созданному чату (бек может вернуть ID в разных регистрах)
                 const newChatId = (resultChat as any)?.id ?? (resultChat as any)?.ID;
                 if (newChatId) {
                     router.push(`/messages/${newChatId}`);
@@ -121,7 +125,7 @@ export default function UserSearch({onClose}: UserSearchProps) {
                 console.error("[CreateChat] Ошибка создания чата:", err);
             }
         },
-        [router, credentials, onClose]
+        [router, credentials, onClose, onUserSelect]
     );
 
     const renderUserItem = useCallback(
@@ -129,7 +133,7 @@ export default function UserSearch({onClose}: UserSearchProps) {
             return (
                 <TouchableOpacity
                     style={styles.userItem}
-                    onPress={() => handleUserSelect(item)}
+                    onPress={() => handleSelect(item)}
                 >
                     <View style={styles.userInfo}>
                         <Avatar user={item} size={48} style={{ marginRight: 12 }} />
@@ -144,7 +148,7 @@ export default function UserSearch({onClose}: UserSearchProps) {
                 </TouchableOpacity>
             );
         },
-        [handleUserSelect]
+        [handleSelect]
     );
 
     return (
@@ -175,7 +179,14 @@ export default function UserSearch({onClose}: UserSearchProps) {
 
             {!isSearching && searchQuery.trim().length >= 2 && (
                 <FlatList
-                    data={users.filter(user => user?.id != null)}
+                    data={users.filter(user => {
+                        const id = (user?.id ?? user?.ID) as number | undefined;
+                        if (id == null) return false;
+                        // don't show current user in search results
+                        if (credentials?.userId && id === credentials.userId) return false;
+                        if (excludeIds && excludeIds.includes(id)) return false;
+                        return true;
+                    })}
                     keyExtractor={(item, idx) => (item?.id != null ? item.id.toString() : `user-${idx}`)}
                     renderItem={renderUserItem}
                     style={styles.resultsList}
@@ -189,13 +200,13 @@ export default function UserSearch({onClose}: UserSearchProps) {
             )}
 
             {searchQuery.trim().length < 2 && !isSearching && (
-                <View style={styles.hintContainer}>
-                    <Ionicons name="information-circle-outline" size={24} color={colors.additionalText}/>
-                    <Text style={styles.hintText}>Введите минимум 2 символа для поиска</Text>
-                </View>
-            )}
-        </View>
-    );
+                 <View style={styles.hintContainer}>
+                     <Ionicons name="information-circle-outline" size={24} color={colors.additionalText}/>
+                     <Text style={styles.hintText}>Введите минимум 2 символа для поиска</Text>
+                 </View>
+             )}
+         </View>
+     );
 }
 
 const styles = StyleSheet.create({

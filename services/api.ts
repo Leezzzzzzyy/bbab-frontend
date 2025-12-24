@@ -562,10 +562,9 @@ export const chatAPI = {
      * Add user to chat
      */
     addUserToChat: async (chatId: number, data: AddUserRequest, token: string): Promise<{ status: string }> => {
-        const response = await fetch(`${API_BASE_URL}/chat/${chatId}/add`, {
+        const response = await fetch(`${API_BASE_URL}/chat/${chatId}/add/${data.user_id}`, {
             method: "POST",
             headers: getAuthHeader(token),
-            body: JSON.stringify(data),
         });
         return handleResponse(response);
     },
@@ -623,7 +622,8 @@ export const chatAPI = {
      * Mark user as joined in chat (cache, Redis)
      */
     joinChat: async (chatId: number, userId: number, token: string): Promise<{ status: string }> => {
-        const response = await fetch(`${API_BASE_URL}/chat/join/${chatId}/${userId}`, {
+        // Обновлённый маршрут: использовать backend endpoint для добавления пользователя в чат
+        const response = await fetch(`${API_BASE_URL}/chat/${chatId}/add/${userId}`, {
             method: "POST",
             headers: getAuthHeader(token),
         });
@@ -635,7 +635,8 @@ export const chatAPI = {
      * Mark user as left in chat (persist and clear if last user)
      */
     leaveChat: async (chatId: number, userId: number, token: string): Promise<{ status: string }> => {
-        const response = await fetch(`${API_BASE_URL}/chat/leave/${chatId}/${userId}`, {
+        // Обновлённый маршрут: использовать backend endpoint для удаления пользователя из чата
+        const response = await fetch(`${API_BASE_URL}/chat/${chatId}/remove/${userId}`, {
             method: "POST",
             headers: getAuthHeader(token),
         });
