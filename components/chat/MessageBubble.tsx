@@ -60,12 +60,12 @@ export default function MessageBubble({
 
     const handleDelete = () => {
         Alert.alert(
-            "Delete message",
-            "Are you sure you want to delete this message?",
+            "Удалить сообщение",
+            "Вы уверены, что хотите удалить это сообщение?",
             [
-                { text: "Cancel", onPress: () => {} },
+                { text: "Отмена", onPress: () => {} },
                 {
-                    text: "Delete",
+                    text: "Удалить",
                     onPress: () => {
                         onDelete?.();
                         setShowActions(false);
@@ -87,7 +87,7 @@ export default function MessageBubble({
                 }}
             >
                 <Text style={{ color: colors.additionalText, fontSize: 14, fontStyle: "italic" }}>
-                    [Message deleted]
+                    [Сообщение удалено]
                 </Text>
             </View>
         );
@@ -164,7 +164,7 @@ export default function MessageBubble({
                                         fontSize: 12,
                                     }}
                                 >
-                                    Cancel
+                                    Отмена
                                 </Text>
                             </Pressable>
                             <Pressable
@@ -178,7 +178,7 @@ export default function MessageBubble({
                                         fontWeight: "600",
                                     }}
                                 >
-                                    Save
+                                    Сохранить
                                 </Text>
                             </Pressable>
                         </View>
@@ -208,7 +208,7 @@ export default function MessageBubble({
                                 }}
                             >
                                 {timeDisplay}
-                                {message.updatedAt && message.updatedAt > message.timestamp && " (edited)"}
+                                {message.updatedAt && message.updatedAt > message.timestamp && " (ред.)"}
                             </Text>
                             {/* Read receipts indicator */}
                             {isMe && message.readBy && message.readBy.length > 0 && (

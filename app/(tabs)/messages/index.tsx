@@ -2,12 +2,10 @@ import colors from "@/assets/colors";
 import {chatStore, type Dialog} from "@/services/chat";
 import {useAuth} from "@/context/AuthContext";
 import {Link} from "expo-router";
-import React, {useEffect, useState} from "react";
+import React, {useCallback, useEffect, useState} from "react";
 import {FlatList, Text, View, Pressable, ActivityIndicator, Alert, Modal, SafeAreaView} from "react-native";
 import UserSearch from "@/components/chat/UserSearch";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
 
 
 export default function MessagesIndex() {
@@ -24,7 +22,7 @@ export default function MessagesIndex() {
             setDialogs(chatStore.listDialogs());
         } catch (error) {
             console.error("Failed to load dialogs:", error);
-            Alert.alert("Error", "Failed to load chats. Please try again.");
+            Alert.alert("Ошибка", "Не удалось загрузить чаты. Пожалуйста, попробуйте еще раз.");
         } finally {
             setIsLoading(false);
         }
@@ -37,13 +35,14 @@ export default function MessagesIndex() {
         // Периодически проверяем последние сообщения для всех диалогов
         // чтобы обновлять список диалогов реактивно, даже если нет активных WebSocket соединений
         const checkAllDialogsInterval = setInterval(() => {
-            if (credentials?.token) {
+            const token = credentials?.token;
+            if (token) {
                 // Получаем актуальный список диалогов на момент проверки
                 const currentDialogs = chatStore.listDialogs();
                 if (currentDialogs.length > 0) {
                     // Проверяем последнее сообщение для каждого диалога
                     currentDialogs.forEach((dialog) => {
-                        chatStore.checkLastMessage(dialog.id, credentials.token).catch((error) => {
+                        chatStore.checkLastMessage(dialog.id, token).catch((error) => {
                             console.error(`Failed to check last message for dialog ${dialog.id}:`, error);
                         });
                     });
@@ -56,12 +55,6 @@ export default function MessagesIndex() {
             clearInterval(checkAllDialogsInterval);
         };
     }, [credentials?.token, loadDialogs]);
-
-    useFocusEffect(
-        useCallback(() => {
-            loadDialogs();
-        }, [loadDialogs])
-    );
 
     return (
         <SafeAreaView style={{flex: 1, backgroundColor: colors.background, padding: 16}}>
@@ -81,7 +74,7 @@ export default function MessagesIndex() {
                             fontWeight: "800",
                         }}
                     >
-                        Messages
+                        Сообщения
                     </Text>
                     <Pressable
                         onPress={() => setIsSearchModalVisible(true)}
@@ -151,7 +144,7 @@ export default function MessagesIndex() {
                                 fontSize: 16,
                                 textAlign: "center",
                             }}>
-                                No chats yet
+                                Нет чатов
                             </Text>
                             <Text style={{
                                 color: colors.additionalText,
@@ -159,7 +152,7 @@ export default function MessagesIndex() {
                                 textAlign: "center",
                                 marginTop: 8,
                             }}>
-                                Start a conversation to begin messaging
+                                Начните разговор, чтобы отправить первое сообщение
                             </Text>
                         </View>
                     )}

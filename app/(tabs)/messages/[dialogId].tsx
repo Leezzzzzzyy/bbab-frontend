@@ -100,7 +100,7 @@ export default function ChatScreen() {
                 setCursor(undefined);
             } catch (error) {
                 console.error("Failed to connect to chat:", error);
-                Alert.alert("Error", "Failed to connect to chat. Please try again.");
+                Alert.alert("Ошибка", "Не удалось подключиться к чату. Пожалуйста, попробуйте снова.");
             } finally {
                 setIsConnecting(false);
             }
@@ -128,7 +128,7 @@ export default function ChatScreen() {
             setConnectionStatus(status as ConnectionStatusType);
         });
 
-        // Периодическая проверка последнего сообщения для обновления изменений
+        // Периодическая проверка последнего сообщения для обновления измеений
         // Проверяем каждые 10 секунд, чтобы последнее сообщение всегда было актуальным
         const checkLastMessageInterval = setInterval(() => {
             if (credentials?.token && connectionStatus === "connected") {
@@ -146,7 +146,7 @@ export default function ChatScreen() {
             clearInterval(checkLastMessageInterval);
             chatStore.disconnectChat(dialogIdNum);
         };
-    }, [dialogIdNum, credentials?.token]); // Убрали connectionStatus из зависимостей, чтобы избежать циклов переподключения
+    }, [dialogIdNum, credentials?.token]); // Убрали connectionStatus из зависимостей, чтобы избежать циклических перерисов
 
     const onSend = useCallback(
         (text: string) => {
@@ -156,7 +156,7 @@ export default function ChatScreen() {
                 chatStore.sendMessage(dialogIdNum, text);
             } catch (error) {
                 console.error("Failed to send message:", error);
-                Alert.alert("Error", "Failed to send message. Please try again.");
+                Alert.alert("Ошибка", "Не удалось отправить сообщение. Пожалуйста, попробуйте снова.");
             }
         },
         [dialogIdNum]

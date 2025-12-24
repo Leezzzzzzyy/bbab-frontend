@@ -28,7 +28,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Messages",
+          title: "Сообщения",
           tabBarIcon: ({
             color,
             focused,
@@ -51,7 +51,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "Профиль",
           tabBarIcon: ({
             color,
             focused,

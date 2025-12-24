@@ -12,7 +12,7 @@ export default function MessagesLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="[dialogId]" options={{ title: "Chat" }} />
+      <Stack.Screen name="[dialogId]" options={{ title: "Чат" }} />
     </Stack>
   );
 }
